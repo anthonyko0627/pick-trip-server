@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import travel_agency.pick_trip.domain.content.client.TourApiClient;
+import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailCommonResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiListResponse;
 import travel_agency.pick_trip.domain.content.dto.request.CompanionType;
 import travel_agency.pick_trip.domain.content.dto.request.ContentListRequest;
@@ -92,6 +93,34 @@ class TourApiContentAdapterTest {
 
             // then
             assertThat(result).isEqualTo(expected);
+        }
+    }
+
+    @Nested
+    @DisplayName("fetchList - TourAPI 오류 응답")
+    class FetchListWithErrorResponse {
+
+        @Test
+        @DisplayName("resultCode가 오류이면 CONTENT_PROVIDER_FAILED를 던진다")
+        void errorResultCode_throwsContentProviderFailed() {
+            // given
+            ContentListRequest request = new ContentListRequest("HADONG", null, null, null, null, 0, 20);
+            Region region = Region.HADONG;
+            TourApiListResponse errorResponse = errorListResponse();
+
+            given(tourApiClient.getAreaBasedList(
+                    eq(region.getAreaCode()),
+                    eq(region.getSigunguCode()),
+                    isNull(),
+                    eq(1),
+                    eq(20)
+            )).willReturn(errorResponse);
+
+            // when & then
+            assertThatThrownBy(() -> adapter.fetchList(request, region))
+                    .isInstanceOf(ContentException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.CONTENT_PROVIDER_FAILED);
         }
     }
 
@@ -217,6 +246,19 @@ class TourApiContentAdapterTest {
                     .extracting("errorCode")
                     .isEqualTo(ErrorCode.CONTENT_PROVIDER_FAILED);
         }
+
+        @Test
+        @DisplayName("resultCode가 오류이면 CONTENT_NOT_FOUND가 아니라 CONTENT_PROVIDER_FAILED를 던진다")
+        void errorResultCode_throwsContentProviderFailedNotNotFound() {
+            // given - 오류 응답은 items도 비어 있으므로, 오류 검사가 없으면 NOT_FOUND로 오분류된다
+            given(tourApiClient.getDetailCommon("2741429")).willReturn(errorCommonResponse());
+
+            // when & then
+            assertThatThrownBy(() -> adapter.fetchDetail("2741429"))
+                    .isInstanceOf(ContentException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.CONTENT_PROVIDER_FAILED);
+        }
     }
 
     private TourApiListResponse emptyListResponse() {
@@ -226,6 +268,24 @@ class TourApiContentAdapterTest {
                                 new TourApiListResponse.Items(List.of()),
                                 20, 1, 0
                         )
+                )
+        );
+    }
+
+    private TourApiListResponse errorListResponse() {
+        return new TourApiListResponse(
+                new TourApiListResponse.Response(
+                        new TourApiListResponse.Header("30", "LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR"),
+                        null
+                )
+        );
+    }
+
+    private TourApiDetailCommonResponse errorCommonResponse() {
+        return new TourApiDetailCommonResponse(
+                new TourApiDetailCommonResponse.Response(
+                        new TourApiDetailCommonResponse.Header("30", "LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR"),
+                        null
                 )
         );
     }

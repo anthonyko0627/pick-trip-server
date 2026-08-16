@@ -71,12 +71,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String newRefreshToken = jwtUtil.generateRefreshToken(jwtUserInfo);
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(refreshTokenExpireTimeDays);
 
-        // 재로그인 시 기존 리프레시 토큰을 갱신하고, 최초 로그인 시 새로 저장한다.
-        refreshTokenRepository.findById(user.getUid())
-                .ifPresentOrElse(
-                        existing -> existing.rotate(newRefreshToken, expiresAt),
-                        () -> refreshTokenRepository.save(RefreshToken.of(user.getUid(), newRefreshToken, expiresAt))
-                );
+        // 사용자당 1행(@Id = userId)이므로 save 의 merge 로 최초 로그인·재로그인 모두 덮어쓴다.
+        // 이 핸들러에는 트랜잭션이 없어 조회한 엔티티는 준영속이라 더티 체킹이 동작하지 않는다.
+        refreshTokenRepository.save(RefreshToken.of(user.getUid(), newRefreshToken, expiresAt));
 
         // 콜백의 state 로 개시 브라우저 nonce 를 회수해 교환 코드에 바인딩한다(nonce 미전달 시 null).
         String state = request.getParameter(OAuth2ParameterNames.STATE);

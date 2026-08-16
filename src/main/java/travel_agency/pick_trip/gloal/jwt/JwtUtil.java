@@ -17,6 +17,10 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
+    /** 토큰 용도 클레임. 리프레시 토큰이 액세스 토큰으로 사용되는 것을 막기 위해 넣는다. */
+    public static final String CLAIM_TOKEN_TYPE = "typ";
+    public static final String TOKEN_TYPE_ACCESS = "access";
+
     @Value("${jwt.secret-key}")
     private String secretKey;
 
@@ -59,7 +63,8 @@ public class JwtUtil {
                 .issuedAt(Date.from(now));
 
         if (type == TokenType.ACCESS) {
-            builder.claim("name", info.nickname())
+            builder.claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS)
+                    .claim("name", info.nickname())
                     .claim("email", info.email())
                     .claim("role", info.role())
                     .expiration(Date.from(now.plus(Duration.ofMillis(accessTokenExpireTimeMs))));

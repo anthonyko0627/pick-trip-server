@@ -2,6 +2,7 @@ package travel_agency.pick_trip.domain.content.adapter;
 
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import travel_agency.pick_trip.domain.content.client.TourApiClient;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailCommonResponse;
@@ -47,15 +48,28 @@ public class TourApiContentAdapter {
                         request.size()
                 );
             }
+            if (raw.isError()) {
+                throw new ContentException(ErrorCode.CONTENT_PROVIDER_FAILED);
+            }
             return mapper.toListResponse(raw, request.page(), request.size(), region);
         } catch (FeignException e) {
             throw new ContentException(ErrorCode.CONTENT_PROVIDER_FAILED);
         }
     }
 
+    /**
+     * 상세 조회. 한 건에 {@code detailCommon2}·{@code detailIntro2}·{@code detailImage2} 로 3콜이 나가므로
+     * TourAPI 일일 요청 한도를 아끼기 위해 {@code contentId} 기준으로 캐시한다.
+     * 예외는 캐시되지 않으므로 일시적 실패(429)나 {@code CONTENT_NOT_FOUND} 가 굳지 않는다.
+     */
+    @Cacheable("contentDetail")
     public ContentDetailResponse fetchDetail(String contentId) {
         try {
             TourApiDetailCommonResponse common = tourApiClient.getDetailCommon(contentId);
+
+            if (common.isError()) {
+                throw new ContentException(ErrorCode.CONTENT_PROVIDER_FAILED);
+            }
 
             boolean isEmpty = common.response() == null
                     || common.response().body() == null

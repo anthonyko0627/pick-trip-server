@@ -5,10 +5,18 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record TourApiDetailCommonResponse(Response response) {
+public record TourApiDetailCommonResponse(Response response) implements TourApiResponse {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Response(Body body) {}
+    public record Response(Header header, Body body) {
+        /** 헤더 없는 과거 호환 생성자 (테스트·내부 생성용). */
+        public Response(Body body) {
+            this(null, body);
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Header(String resultCode, String resultMsg) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Body(Items items) {}
@@ -35,4 +43,14 @@ public record TourApiDetailCommonResponse(Response response) {
             String areacode,
             String sigungucode
     ) {}
+
+    @Override
+    public String resultCode() {
+        return response != null && response.header() != null ? response.header().resultCode() : null;
+    }
+
+    @Override
+    public String resultMsg() {
+        return response != null && response.header() != null ? response.header().resultMsg() : null;
+    }
 }

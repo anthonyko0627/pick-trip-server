@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: '2010-09-09'
+# Notifies a Discord webhook when the RDS instance stops or starts.
+# Deploy in the SAME region as the RDS instance (RDS events land on that region's default bus).
+#
+# NOTE: this file is intentionally pure ASCII. The AWS CLI on Windows reads template
+# files with the system codepage (cp949) and fails on UTF-8 bytes. Korean text and
+# emoji are therefore written as JSON \u escapes inside InputTemplate, which Discord
+# decodes when it parses the request body as JSON.
+Description: Notify a Discord webhook on RDS DB instance stop/start events.
+
+Parameters:
+  DiscordWebhookUrl:
+    Type: String
+    NoEcho: true
+    Description: Discord channel webhook URL (secret - never commit the value)
+  DbInstanceArn:
+    Type: String
+    Description: ARN of the RDS DB instance to watch
+
+Resources:
+  # Discord webhooks need no auth, but an API Destination requires a Connection.
+  # Send a header Discord ignores just to satisfy that requirement.
+  DiscordConnection:
+    Type: AWS::Events::Connection
+    Properties:
+      Name: discord-webhook
+      AuthorizationType: API_KEY
+      AuthParameters:
+        ApiKeyAuthParameters:
+          ApiKeyName: X-Unused
+          ApiKeyValue: unused
+
+  DiscordApiDestination:
+    Type: AWS::Events::ApiDestination
+    Properties:
+      Name: discord-webhook
+      ConnectionArn: !GetAtt DiscordConnection.Arn
+      HttpMethod: POST
+      InvocationEndpoint: !Ref DiscordWebhookUrl
+      InvocationRateLimitPerSecond: 10
+
+  InvokeDestinationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-discord-destination
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: events:InvokeApiDestination
+                Resource:
+                  - !GetAtt DiscordApiDestination.Arn
+                  - !GetAtt DiscordApiDestination.ArnForPolicy
+
+  # RDS-EVENT-0087 - "DB instance has been stopped"
+  # Message renders as: [red circle] **RDS jungji-doem** - `id` (time UTC)
+  RdsStoppedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: rds-stopped-to-discord
+      Description: Notify Discord when the DB instance stops (RDS-EVENT-0087)
+      EventPattern:
+        source:
+          - aws.rds
+        detail-type:
+          - RDS DB Instance Event
+        detail:
+          SourceArn:
+            - !Ref DbInstanceArn
+          EventID:
+            - RDS-EVENT-0087
+      Targets:
+        - Id: discord
+          Arn: !GetAtt DiscordApiDestination.Arn
+          RoleArn: !GetAtt InvokeDestinationRole.Arn
+          InputTransformer:
+            InputPathsMap:
+              id: $.detail.SourceIdentifier
+              at: $.time
+            InputTemplate: '{"content":"\ud83d\udd34 **RDS \uc911\uc9c0\ub428** - `<id>` (<at> UTC)"}'
+
+  # RDS-EVENT-0088 - "DB instance has been started"
+  # Message renders as: [green circle] **RDS silhaeng-jung** - `id` (time UTC)
+  RdsStartedRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: rds-started-to-discord
+      Description: Notify Discord when the DB instance starts (RDS-EVENT-0088)
+      EventPattern:
+        source:
+          - aws.rds
+        detail-type:
+          - RDS DB Instance Event
+        detail:
+          SourceArn:
+            - !Ref DbInstanceArn
+          EventID:
+            - RDS-EVENT-0088
+      Targets:
+        - Id: discord
+          Arn: !GetAtt DiscordApiDestination.Arn
+          RoleArn: !GetAtt InvokeDestinationRole.Arn
+          InputTransformer:
+            InputPathsMap:
+              id: $.detail.SourceIdentifier
+              at: $.time
+            InputTemplate: '{"content":"\ud83d\udfe2 **RDS \uc2e4\ud589 \uc911** - `<id>` (<at> UTC)"}'

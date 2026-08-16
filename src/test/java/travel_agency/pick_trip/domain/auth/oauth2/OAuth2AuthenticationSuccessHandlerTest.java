@@ -24,7 +24,6 @@ import travel_agency.pick_trip.gloal.jwt.JwtUserInfo;
 import travel_agency.pick_trip.gloal.jwt.JwtUtil;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,7 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OAuth2AuthenticationSuccessHandler")
@@ -84,7 +82,6 @@ class OAuth2AuthenticationSuccessHandlerTest {
     private void stubTokenIssue() {
         given(jwtUtil.generateAccessToken(any(JwtUserInfo.class))).willReturn(ACCESS_TOKEN);
         given(jwtUtil.generateRefreshToken(any(JwtUserInfo.class))).willReturn(REFRESH_TOKEN_VALUE);
-        given(refreshTokenRepository.findById(USER_UID)).willReturn(Optional.empty());
         given(exchangeCodeStore.issue(any(OAuthExchangeData.class))).willReturn(EXCHANGE_CODE);
     }
 
@@ -235,8 +232,8 @@ class OAuth2AuthenticationSuccessHandlerTest {
     class RefreshTokenHandling {
 
         @Test
-        @DisplayName("최초 로그인 시 리프레시 토큰을 새로 저장한다")
-        void firstLogin_savesNewRefreshToken() throws Exception {
+        @DisplayName("로그인 시 새 리프레시 토큰으로 save를 호출해 기존 행을 덮어쓴다")
+        void reLogin_savesNewRefreshToken() throws Exception {
             // given
             stubTokenIssue();
 
@@ -245,28 +242,12 @@ class OAuth2AuthenticationSuccessHandlerTest {
                     new MockHttpServletRequest(), new MockHttpServletResponse(), mockAuthentication(userWithUid(USER_UID)));
 
             // then
-            then(refreshTokenRepository).should().save(any(RefreshToken.class));
-        }
-
-        @Test
-        @DisplayName("재로그인 시 기존 리프레시 토큰을 Rotate하고 새로 저장하지 않는다")
-        void reLogin_rotatesExistingTokenWithoutSaving() throws Exception {
-            // given
-            User user = userWithUid(USER_UID);
-            RefreshToken existingToken = RefreshToken.of(USER_UID, "old-token",
-                    LocalDateTime.now().plusDays(14));
-            given(jwtUtil.generateAccessToken(any())).willReturn(ACCESS_TOKEN);
-            given(jwtUtil.generateRefreshToken(any())).willReturn(REFRESH_TOKEN_VALUE);
-            given(refreshTokenRepository.findById(USER_UID)).willReturn(Optional.of(existingToken));
-            given(exchangeCodeStore.issue(any(OAuthExchangeData.class))).willReturn(EXCHANGE_CODE);
-
-            // when
-            successHandler.onAuthenticationSuccess(
-                    new MockHttpServletRequest(), new MockHttpServletResponse(), mockAuthentication(user));
-
-            // then
-            assertThat(existingToken.getToken()).isEqualTo(REFRESH_TOKEN_VALUE);
-            then(refreshTokenRepository).should(never()).save(any(RefreshToken.class));
+            ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+            then(refreshTokenRepository).should().save(captor.capture());
+            RefreshToken saved = captor.getValue();
+            assertThat(saved.getUserId()).isEqualTo(USER_UID);
+            assertThat(saved.getToken()).isEqualTo(REFRESH_TOKEN_VALUE);
+            assertThat(saved.getExpiresAt()).isAfter(LocalDateTime.now());
         }
     }
 

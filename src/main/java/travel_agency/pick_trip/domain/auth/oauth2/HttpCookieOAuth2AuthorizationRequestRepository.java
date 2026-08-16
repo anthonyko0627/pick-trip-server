@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.time.Duration;
@@ -31,6 +32,15 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     private static final String COOKIE_NAME = "oauth2_auth_request";
     // state 유효 시간: 사용자가 3분 안에 소셜 로그인을 완료해야 한다.
     private static final Duration COOKIE_MAX_AGE = Duration.ofSeconds(180);
+
+    // OAuth2AuthorizationRequest 와 그 필드(문자열·java.util 컬렉션·OAuth2 core 값 타입)만 허용하고
+    // 마지막 "!*" 로 그 밖의 모든 클래스를 거부한다. 거부 시 InvalidClassException(IOException 하위)이 발생한다.
+    private static final ObjectInputFilter DESERIALIZE_FILTER = ObjectInputFilter.Config.createFilter(
+            "maxdepth=20;maxrefs=1000;maxarray=1000;"
+                    + "org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;"
+                    + "org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationResponseType;"
+                    + "org.springframework.security.oauth2.core.AuthorizationGrantType;"
+                    + "java.util.*;java.lang.*;!*");
 
     // 운영(HTTPS)에서는 true, 로컬(HTTP)에서는 false. 프로퍼티로 환경별 제어한다.
     @Value("${app.oauth2.cookie-secure:false}")
@@ -104,6 +114,8 @@ public class HttpCookieOAuth2AuthorizationRequestRepository
     private OAuth2AuthorizationRequest deserialize(String value) {
         try (ByteArrayInputStream bis = new ByteArrayInputStream(Base64.getUrlDecoder().decode(value));
              ObjectInputStream ois = new ObjectInputStream(bis)) {
+            // 쿠키 값은 클라이언트가 임의로 바꿔 보낼 수 있으므로, 인가요청 복원에 필요한 타입만 허용하고 나머지는 거부한다.
+            ois.setObjectInputFilter(DESERIALIZE_FILTER);
             return (OAuth2AuthorizationRequest) ois.readObject();
         } catch (IOException | ClassNotFoundException e) {
             throw new IllegalStateException("OAuth2AuthorizationRequest 역직렬화 실패", e);

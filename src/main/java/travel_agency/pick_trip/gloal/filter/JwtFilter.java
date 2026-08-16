@@ -46,6 +46,13 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             Claims claims = jwtUtil.parseToken(token).getPayload();
+
+            // 리프레시 토큰을 Bearer 로 제시해 보호 API 를 통과하는 것을 막는다.
+            if (!JwtUtil.TOKEN_TYPE_ACCESS.equals(claims.get(JwtUtil.CLAIM_TOKEN_TYPE, String.class))) {
+                sendErrorResponse(response, request, ErrorCode.AUTH_INVALID_TOKEN);
+                return;
+            }
+
             JwtUserPrincipal principal = JwtUserPrincipal.from(claims);
 
             UsernamePasswordAuthenticationToken authentication =

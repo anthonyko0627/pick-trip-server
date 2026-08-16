@@ -31,6 +31,14 @@ spring:
               - profile_nickname
               - profile_image
 
+  # TourAPI 상세 조회 캐시. 상세 1건은 detailCommon2·detailIntro2·detailImage2 로 3콜을 쓰므로
+  # 같은 콘텐츠 재조회를 막는 것만으로 일일 요청량이 크게 줄어든다.
+  # TTL 24h: 콘텐츠 기본 정보는 자주 바뀌지 않으며 동기화 배치 주기도 주 1회다.
+  cache:
+    cache-names: contentDetail
+    caffeine:
+      spec: expireAfterWrite=24h,maximumSize=500,recordStats
+
   # 스키마는 Flyway 로만 변경한다. 컬럼 추가 시 db/migration 에 V{n}__설명.sql 을 추가하면 부팅 시 자동 적용된다.
   # 기존 RDS 에는 이미 테이블이 있으므로 baseline 을 허용하고, 버전 0 으로 잡아 V1 부터 실행되게 한다.
   flyway:

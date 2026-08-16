@@ -95,20 +95,36 @@ public class Basket {
     }
 
     /**
-     * 여행 조건을 전달받은 값으로 교체한다. null 인 동행 조건은 빈 집합으로 처리한다.
+     * 여행 조건을 부분 갱신한다. {@code null} 인 필드는 "변경 없음"으로 보고 기존 값을 유지한다.
+     *
+     * <p>전체 교체 방식이던 시절에는 클라이언트가 필드를 빠뜨리면 저장돼 있던 값이 조용히 지워졌고,
+     * 그 실패가 한참 뒤 일정 생성에서 {@code ITINERARY_INPUT_INSUFFICIENT} 로만 드러나
+     * 원인을 찾기 어려웠다 (#43).
+     *
+     * <p>동행 조건만 예외로, 빈 집합을 명시적으로 보내면 비운다.
      */
+    // ponytail: null 을 "변경 없음"으로 쓰므로 지역·날짜·기간을 다시 비울 방법이 없다.
+    // 비우기가 필요해지면 JsonNullable 같은 래퍼로 필드 부재와 명시적 null 을 구분한다.
     public void updateConditions(
             Region region,
             LocalDate travelDate,
             Integer duration,
             Set<TravelCondition> companions
     ) {
-        this.region = region;
-        this.travelDate = travelDate;
-        this.duration = duration;
-        this.companions = (companions == null || companions.isEmpty())
-                ? EnumSet.noneOf(TravelCondition.class)
-                : EnumSet.copyOf(companions);
+        if (region != null) {
+            this.region = region;
+        }
+        if (travelDate != null) {
+            this.travelDate = travelDate;
+        }
+        if (duration != null) {
+            this.duration = duration;
+        }
+        if (companions != null) {
+            this.companions = companions.isEmpty()
+                    ? EnumSet.noneOf(TravelCondition.class)
+                    : EnumSet.copyOf(companions);
+        }
     }
 
     public void addItem(BasketItem item) {

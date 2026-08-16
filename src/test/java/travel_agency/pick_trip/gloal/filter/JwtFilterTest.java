@@ -46,8 +46,20 @@ class JwtFilterTest {
     @SuppressWarnings("unchecked")
     private Jws<Claims> mockJwsWithClaims() {
         Claims claims = mock(Claims.class);
+        given(claims.get(JwtUtil.CLAIM_TOKEN_TYPE, String.class)).willReturn(JwtUtil.TOKEN_TYPE_ACCESS);
         given(claims.getSubject()).willReturn(USER_UID.toString());
         given(claims.get("role", String.class)).willReturn("USER");
+
+        Jws<Claims> jws = mock(Jws.class);
+        given(jws.getPayload()).willReturn(claims);
+        return jws;
+    }
+
+    /** typ 클레임만 지정한 토큰. 액세스 토큰이 아닌 토큰을 흉내 낸다. */
+    @SuppressWarnings("unchecked")
+    private Jws<Claims> mockJwsWithTokenType(String tokenType) {
+        Claims claims = mock(Claims.class);
+        given(claims.get(JwtUtil.CLAIM_TOKEN_TYPE, String.class)).willReturn(tokenType);
 
         Jws<Claims> jws = mock(Jws.class);
         given(jws.getPayload()).willReturn(claims);
@@ -198,6 +210,54 @@ class JwtFilterTest {
             // then
             assertThat(response.getStatus()).isEqualTo(401);
             assertThat(chain.getRequest()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("토큰 타입 검증")
+    class TokenTypeValidation {
+
+        @Test
+        @DisplayName("리프레시 토큰을 Bearer로 제시하면 401을 응답하고 인증이 등록되지 않는다")
+        void refreshToken_returns401AndDoesNotAuthenticate() throws Exception {
+            // given
+            // 헬퍼가 내부에서 스텁을 만들므로 given(...) 인자 자리에서 호출하면 중첩 스터빙이 된다.
+            var jws = mockJwsWithTokenType("refresh");
+            given(jwtUtil.parseToken(VALID_TOKEN)).willReturn(jws);
+
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            // when
+            jwtFilter.doFilterInternal(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(chain.getRequest()).isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        @Test
+        @DisplayName("typ 클레임이 없는 토큰이면 401을 응답하고 인증이 등록되지 않는다")
+        void missingTokenType_returns401AndDoesNotAuthenticate() throws Exception {
+            // given
+            var jws = mockJwsWithTokenType(null);
+            given(jwtUtil.parseToken(VALID_TOKEN)).willReturn(jws);
+
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+
+            // when
+            jwtFilter.doFilterInternal(request, response, chain);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(chain.getRequest()).isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
     }
 }

@@ -59,6 +59,7 @@ class JwtUtilTest {
             assertThat(claims.get("name", String.class)).isEqualTo(NICKNAME);
             assertThat(claims.get("email", String.class)).isEqualTo(EMAIL);
             assertThat(claims.get("role", String.class)).isEqualTo(ROLE);
+            assertThat(claims.get(JwtUtil.CLAIM_TOKEN_TYPE, String.class)).isEqualTo(JwtUtil.TOKEN_TYPE_ACCESS);
         }
 
     }
@@ -82,6 +83,8 @@ class JwtUtilTest {
             assertThat(claims.get("name")).isNull();
             assertThat(claims.get("email")).isNull();
             assertThat(claims.get("role")).isNull();
+            // 타입 클레임이 없어야 JwtFilter 가 이 토큰을 액세스 토큰으로 오인하지 않는다.
+            assertThat(claims.get(JwtUtil.CLAIM_TOKEN_TYPE)).isNull();
         }
     }
 
