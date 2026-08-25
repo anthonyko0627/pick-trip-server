@@ -14,10 +14,13 @@ import travel_agency.pick_trip.domain.content.service.ContentService;
 import travel_agency.pick_trip.domain.itinerary.dto.request.SaveItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryGenerateResponse;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryResponse;
+import travel_agency.pick_trip.domain.itinerary.dto.response.ItinerarySummaryResponse;
 import travel_agency.pick_trip.domain.itinerary.entity.Itinerary;
 import travel_agency.pick_trip.domain.itinerary.entity.ItineraryDay;
 import travel_agency.pick_trip.domain.itinerary.entity.ItineraryItem;
 import travel_agency.pick_trip.domain.itinerary.repository.ItineraryRepository;
+import travel_agency.pick_trip.domain.share.entity.ShareToken;
+import travel_agency.pick_trip.domain.share.repository.ShareTokenRepository;
 import travel_agency.pick_trip.gloal.error.ErrorCode;
 import travel_agency.pick_trip.gloal.error.exception.ItineraryException;
 import travel_agency.pick_trip.infra.ai.AiItineraryClient;
@@ -41,6 +44,7 @@ public class ItineraryService {
     private final ContentService contentService;
     private final AiItineraryClient aiItineraryClient;
     private final ItineraryRepository itineraryRepository;
+    private final ShareTokenRepository shareTokenRepository;
 
     /**
      * 사용자 바구니를 입력으로 AI 일정을 생성한다 (저장 전 미리보기).
@@ -94,6 +98,29 @@ public class ItineraryService {
     @Transactional(readOnly = true)
     public ItineraryResponse getItinerary(UUID userId, UUID itineraryId) {
         return ItineraryResponse.from(findOwned(userId, itineraryId));
+    }
+
+    /**
+     * 사용자가 저장한 일정 목록을 최근 수정 순으로 조회한다. 저장된 일정이 없으면 빈 리스트를 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public List<ItinerarySummaryResponse> getMyItineraries(UUID userId) {
+        return itineraryRepository.findByUserIdOrderByLastModifiedAtDesc(userId).stream()
+                .map(ItinerarySummaryResponse::from)
+                .toList();
+    }
+
+    /**
+     * 일정을 삭제한다. {@link travel_agency.pick_trip.domain.share.entity.ShareToken} 은
+     * 일정과 FK 없이 {@code itineraryId} 만 들고 있어 일정이 삭제돼도 자동으로 사라지지 않으므로,
+     * 활성 공유 토큰이 있으면 명시적으로 비활성화한 뒤 일정을 삭제한다.
+     */
+    @Transactional
+    public void delete(UUID userId, UUID itineraryId) {
+        Itinerary itinerary = findOwned(userId, itineraryId);
+        shareTokenRepository.findByItineraryIdAndActiveTrue(itineraryId)
+                .ifPresent(ShareToken::deactivate);
+        itineraryRepository.delete(itinerary);
     }
 
     /**

@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -17,12 +18,18 @@ import org.springframework.http.ResponseEntity;
 import travel_agency.pick_trip.domain.itinerary.dto.request.SaveItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryGenerateResponse;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryResponse;
+import travel_agency.pick_trip.domain.itinerary.dto.response.ItinerarySummaryResponse;
 import travel_agency.pick_trip.domain.itinerary.service.ItineraryService;
 import travel_agency.pick_trip.domain.region.Region;
+import travel_agency.pick_trip.gloal.error.ErrorCode;
+import travel_agency.pick_trip.gloal.error.exception.ItineraryException;
 import travel_agency.pick_trip.gloal.jwt.JwtUserPrincipal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
@@ -173,6 +180,86 @@ class ItineraryControllerTest {
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(result.getBody()).isNotNull();
             assertThat(result.getBody().title()).isEqualTo("재생성된 일정");
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/itineraries")
+    class GetMyItineraries {
+
+        @Test
+        @DisplayName("저장된 일정 목록을 조회하면 200과 일정 요약 목록을 반환한다")
+        void getMyItineraries_returns200() {
+            // given
+            ItinerarySummaryResponse summary = new ItinerarySummaryResponse(
+                    ITINERARY_ID, "하동 1박 2일", Region.HADONG,
+                    LocalDate.of(2026, 7, 1), 2, LocalDateTime.of(2026, 6, 21, 12, 0)
+            );
+            given(itineraryService.getMyItineraries(USER_UID)).willReturn(List.of(summary));
+
+            // when
+            ResponseEntity<List<ItinerarySummaryResponse>> result =
+                    itineraryController.getMyItineraries(principal());
+
+            // then
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(result.getBody()).isNotNull();
+            assertThat(result.getBody()).hasSize(1);
+            ItinerarySummaryResponse body = result.getBody().get(0);
+            assertThat(body.itineraryId()).isEqualTo(ITINERARY_ID);
+            assertThat(body.title()).isEqualTo("하동 1박 2일");
+            assertThat(body.region()).isEqualTo(Region.HADONG);
+            assertThat(body.lastModifiedAt()).isEqualTo(LocalDateTime.of(2026, 6, 21, 12, 0));
+        }
+
+        @Test
+        @DisplayName("저장된 일정이 없으면 빈 배열을 반환한다")
+        void getMyItineraries_returnsEmptyListWhenNoItinerary() {
+            // given
+            given(itineraryService.getMyItineraries(USER_UID)).willReturn(List.of());
+
+            // when
+            ResponseEntity<List<ItinerarySummaryResponse>> result =
+                    itineraryController.getMyItineraries(principal());
+
+            // then
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(result.getBody()).isNotNull();
+            assertThat(result.getBody()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/v1/itineraries/{itineraryId}")
+    class Delete {
+
+        @Test
+        @DisplayName("일정을 삭제하면 204를 반환하고 서비스의 삭제를 호출한다")
+        void delete_returns204() {
+            // given & when
+            ResponseEntity<Void> result = itineraryController.delete(principal(), ITINERARY_ID);
+
+            // then
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+            then(itineraryService).should().delete(USER_UID, ITINERARY_ID);
+        }
+
+        @Test
+        @DisplayName("타인의 일정을 삭제하려 하면 ITINERARY_NOT_FOUND 예외를 던진다")
+        void delete_throwsItineraryNotFoundWhenOwnedByOther() {
+            // given
+            willThrow(new ItineraryException(ErrorCode.ITINERARY_NOT_FOUND))
+                    .given(itineraryService).delete(USER_UID, ITINERARY_ID);
+
+            // when
+            ThrowableAssert.ThrowingCallable action =
+                    () -> itineraryController.delete(principal(), ITINERARY_ID);
+
+            // then
+            assertThatThrownBy(action)
+                    .isInstanceOf(ItineraryException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.ITINERARY_NOT_FOUND);
         }
     }
 }

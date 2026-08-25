@@ -1,11 +1,13 @@
 package travel_agency.pick_trip.domain.itinerary.controller;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import travel_agency.pick_trip.domain.itinerary.dto.request.SaveItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryGenerateResponse;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryResponse;
+import travel_agency.pick_trip.domain.itinerary.dto.response.ItinerarySummaryResponse;
 import travel_agency.pick_trip.domain.itinerary.service.ItineraryService;
 import travel_agency.pick_trip.gloal.jwt.JwtUserPrincipal;
 
@@ -80,5 +83,27 @@ public class ItineraryController {
             @PathVariable UUID itineraryId
     ) {
         return ResponseEntity.ok(itineraryService.regenerate(principal.getUid(), itineraryId));
+    }
+
+    /**
+     * 사용자가 저장한 일정 목록을 조회한다.
+     */
+    @GetMapping
+    public ResponseEntity<List<ItinerarySummaryResponse>> getMyItineraries(
+            @AuthenticationPrincipal JwtUserPrincipal principal
+    ) {
+        return ResponseEntity.ok(itineraryService.getMyItineraries(principal.getUid()));
+    }
+
+    /**
+     * 저장된 일정을 삭제한다.
+     */
+    @DeleteMapping("/{itineraryId}")
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            @PathVariable UUID itineraryId
+    ) {
+        itineraryService.delete(principal.getUid(), itineraryId);
+        return ResponseEntity.noContent().build();
     }
 }
