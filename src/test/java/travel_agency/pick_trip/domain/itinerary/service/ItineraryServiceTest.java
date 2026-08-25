@@ -1,14 +1,17 @@
 package travel_agency.pick_trip.domain.itinerary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -33,11 +36,14 @@ import travel_agency.pick_trip.domain.content.service.ContentService;
 import travel_agency.pick_trip.domain.itinerary.dto.request.SaveItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryGenerateResponse;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryResponse;
+import travel_agency.pick_trip.domain.itinerary.dto.response.ItinerarySummaryResponse;
 import travel_agency.pick_trip.domain.itinerary.entity.Itinerary;
 import travel_agency.pick_trip.domain.itinerary.entity.ItineraryDay;
 import travel_agency.pick_trip.domain.itinerary.entity.ItineraryItem;
 import travel_agency.pick_trip.domain.itinerary.repository.ItineraryRepository;
 import travel_agency.pick_trip.domain.region.Region;
+import travel_agency.pick_trip.domain.share.entity.ShareToken;
+import travel_agency.pick_trip.domain.share.repository.ShareTokenRepository;
 import travel_agency.pick_trip.gloal.error.ErrorCode;
 import travel_agency.pick_trip.gloal.error.exception.ItineraryException;
 import travel_agency.pick_trip.gloal.error.exception.PickTripException;
@@ -55,6 +61,7 @@ class ItineraryServiceTest {
     @Mock private ContentService contentService;
     @Mock private AiItineraryClient aiItineraryClient;
     @Mock private ItineraryRepository itineraryRepository;
+    @Mock private ShareTokenRepository shareTokenRepository;
     @InjectMocks private ItineraryService itineraryService;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -107,6 +114,17 @@ class ItineraryServiceTest {
         day.addItem(ItineraryItem.builder()
                 .contentId("c1").title("title-c1").orderIndex(1).reason("기존 이유").pinned(false).build());
         itinerary.addDay(day);
+        return itinerary;
+    }
+
+    private Itinerary mockSummaryItinerary(UUID itineraryId, String title, LocalDateTime lastModifiedAt) {
+        Itinerary itinerary = mock(Itinerary.class);
+        given(itinerary.getItineraryId()).willReturn(itineraryId);
+        given(itinerary.getTitle()).willReturn(title);
+        given(itinerary.getRegion()).willReturn(Region.HADONG);
+        given(itinerary.getTravelDate()).willReturn(LocalDate.of(2026, 7, 1));
+        given(itinerary.getDuration()).willReturn(2);
+        given(itinerary.getLastModifiedAt()).willReturn(lastModifiedAt);
         return itinerary;
     }
 
@@ -358,6 +376,103 @@ class ItineraryServiceTest {
             assertThat(response.title()).isEqualTo("하동 1박 2일 가족 여행");
             assertThat(response.days().get(0).items()).hasSize(2);
             assertThat(response.days().get(0).items().get(1).contentId()).isEqualTo("c2");
+        }
+    }
+
+    @Nested
+    @DisplayName("getMyItineraries")
+    class GetMyItineraries {
+
+        @Test
+        @DisplayName("로그인 사용자의 일정 목록을 최근 수정순 요약으로 반환한다")
+        void returnsSummariesInRepositoryOrder() {
+            UUID recentId = UUID.randomUUID();
+            UUID olderId = UUID.randomUUID();
+            Itinerary recent = mockSummaryItinerary(recentId, "최근 일정", LocalDateTime.of(2026, 7, 10, 0, 0));
+            Itinerary older = mockSummaryItinerary(olderId, "이전 일정", LocalDateTime.of(2026, 7, 1, 0, 0));
+            given(itineraryRepository.findByUserIdOrderByLastModifiedAtDesc(USER_ID))
+                    .willReturn(List.of(recent, older));
+
+            List<ItinerarySummaryResponse> responses = itineraryService.getMyItineraries(USER_ID);
+
+            assertThat(responses).hasSize(2);
+            assertThat(responses.get(0).itineraryId()).isEqualTo(recentId);
+            assertThat(responses.get(0).title()).isEqualTo("최근 일정");
+            assertThat(responses.get(0).region()).isEqualTo(Region.HADONG);
+            assertThat(responses.get(0).travelDate()).isEqualTo(LocalDate.of(2026, 7, 1));
+            assertThat(responses.get(0).duration()).isEqualTo(2);
+            assertThat(responses.get(0).lastModifiedAt()).isEqualTo(LocalDateTime.of(2026, 7, 10, 0, 0));
+            assertThat(responses.get(1).itineraryId()).isEqualTo(olderId);
+        }
+
+        @Test
+        @DisplayName("저장된 일정이 없으면 빈 목록을 반환한다")
+        void noItineraries_returnsEmptyList() {
+            given(itineraryRepository.findByUserIdOrderByLastModifiedAtDesc(USER_ID)).willReturn(List.of());
+
+            List<ItinerarySummaryResponse> responses = itineraryService.getMyItineraries(USER_ID);
+
+            assertThat(responses).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("delete")
+    class Delete {
+
+        @Test
+        @DisplayName("본인 일정을 삭제하면 itineraryRepository.delete 가 호출된다")
+        void deletesOwnedItinerary() {
+            Itinerary itinerary = itineraryOwnedBy(USER_ID);
+            given(itineraryRepository.findWithDaysById(ITINERARY_ID)).willReturn(Optional.of(itinerary));
+            given(shareTokenRepository.findByItineraryIdAndActiveTrue(ITINERARY_ID)).willReturn(Optional.empty());
+
+            itineraryService.delete(USER_ID, ITINERARY_ID);
+
+            verify(itineraryRepository).delete(itinerary);
+        }
+
+        @Test
+        @DisplayName("타인 일정 삭제 요청은 ITINERARY_NOT_FOUND 예외를 던지고 delete 가 호출되지 않는다")
+        void notOwned_throwsAndDoesNotDelete() {
+            given(itineraryRepository.findWithDaysById(ITINERARY_ID))
+                    .willReturn(Optional.of(itineraryOwnedBy(UUID.randomUUID())));
+
+            ThrowingCallable action = () -> itineraryService.delete(USER_ID, ITINERARY_ID);
+
+            assertThatThrownBy(action)
+                    .isInstanceOf(PickTripException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.ITINERARY_NOT_FOUND);
+            verify(itineraryRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("일정 삭제 시 활성 공유 토큰이 비활성화된다")
+        void deactivatesActiveShareToken() {
+            Itinerary itinerary = itineraryOwnedBy(USER_ID);
+            ShareToken shareToken = ShareToken.builder().itineraryId(ITINERARY_ID).token("share-token").build();
+            given(itineraryRepository.findWithDaysById(ITINERARY_ID)).willReturn(Optional.of(itinerary));
+            given(shareTokenRepository.findByItineraryIdAndActiveTrue(ITINERARY_ID))
+                    .willReturn(Optional.of(shareToken));
+
+            itineraryService.delete(USER_ID, ITINERARY_ID);
+
+            assertThat(shareToken.isActive()).isFalse();
+            verify(itineraryRepository).delete(itinerary);
+        }
+
+        @Test
+        @DisplayName("활성 공유 토큰이 없어도 삭제가 정상 동작한다")
+        void noActiveShareToken_stillDeletes() {
+            Itinerary itinerary = itineraryOwnedBy(USER_ID);
+            given(itineraryRepository.findWithDaysById(ITINERARY_ID)).willReturn(Optional.of(itinerary));
+            given(shareTokenRepository.findByItineraryIdAndActiveTrue(ITINERARY_ID)).willReturn(Optional.empty());
+
+            ThrowingCallable action = () -> itineraryService.delete(USER_ID, ITINERARY_ID);
+
+            assertThatCode(action).doesNotThrowAnyException();
+            verify(itineraryRepository).delete(itinerary);
         }
     }
 }
