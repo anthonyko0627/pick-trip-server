@@ -61,9 +61,13 @@
 | ----- | ----------------------------------------- | :------: | ------------------------ |
 | POST  | `/api/v1/itineraries/generate`            | O        | AI 일정 생성 요청         |
 | POST  | `/api/v1/itineraries`                     | O        | 일정 저장                 |
+| GET   | `/api/v1/itineraries`                     | O        | 저장된 일정 목록 조회 (요약, 최근 수정순) |
 | GET   | `/api/v1/itineraries/{id}`                | O        | 저장된 일정 상세 조회     |
 | PATCH | `/api/v1/itineraries/{id}`                | O        | 일정 수정 (순서, 추가 등) |
 | POST  | `/api/v1/itineraries/{id}/regenerate`     | O        | 전체 또는 하루 일정 재생성|
+| DELETE| `/api/v1/itineraries/{id}`                | O        | 저장된 일정 삭제          |
+
+목록 조회는 요약 정보(`itineraryId`, `title`, `region`, `travelDate`, `duration`, `lastModifiedAt`)만 반환하며 일차·항목은 포함하지 않는다. 상세는 `GET /api/v1/itineraries/{id}` 를 사용한다. 일정 삭제 시 해당 일정의 활성 공유 토큰도 함께 비활성화된다.
 
 ## 일정 공유
 
