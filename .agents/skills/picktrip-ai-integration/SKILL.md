@@ -46,14 +46,14 @@ src/main/java/travel_agency/pick_trip/infra/ai/
 | 항목 | 원천 | 비고 |
 |------|------|------|
 | 여행 날짜/기간 | 바구니 조건 | 필수 |
-| 동행 조건 | 바구니 조건 | 필수 |
+| 동행·스타일 조건 | 바구니 조건 | 필수. enum 코드가 아니라 한국어 라벨(`TravelCondition.getLabel()`)로 전달 |
 | 장소명 | `TravelContent.title` | 필수 |
 | 카테고리 | `TravelContent.category` | 필수 |
 | 좌표 | `latitude`, `longitude` | 동선 계산 필수 |
 | 운영시간 | `ContentDetail.useTime` | 품질 검수 필요 |
 | 휴무일 | `ContentDetail.restDate` | 품질 검수 필요 |
 | 행사 기간 | `eventStartDate`, `eventEndDate` | 축제 배치 제약 |
-| 우선순위 | `BasketItem.priority` | MUST_VISIT 우선 배치 |
+| 우선순위 | `BasketItem.priority` | "꼭 가기" 우선 배치. enum 코드가 아니라 한국어 라벨(`Priority.getLabel()`)로 전달 |
 | 예상 체류 시간 | 자체 검수 데이터 | TourAPI만으로 부족 |
 | 실내/실외 | `ContentDetail.indoorOutdoor` | 우천 대안 판단 |
 | 걷기 부담 | `ContentDetail.walkingLevel` | 부모님/아이 동반 고려 |
@@ -69,6 +69,10 @@ src/main/java/travel_agency/pick_trip/infra/ai/
   제거된 contentId 는 WARN 로그로만 남기고, 일차 구성·순서는 그대로 둔다.
 - 각 장소 배치에 **AI가 생성한 이유**(`reason`)를 함께 반환한다.
   - 예: "축제 운영시간이 오전 10시부터라서 1일차 오전에 배치했습니다."
+- **`reason` 문구는 서버에서 후처리**한다 (`ReasonSanitizer`). 시스템 프롬프트로 금지를 지시해도
+  강제가 아니므로, contentId 표기·괄호 안 숫자 ID·동행/우선순위 enum 코드를 걷어내고 enum 코드는
+  한국어 라벨로 치환한다. 생성 미리보기와 저장 경로(`save`·`modify`·`regenerate`) 모두에 적용하며,
+  바뀐 건수는 WARN 로그로만 남긴다.
 
 ## 실패 처리 전략
 

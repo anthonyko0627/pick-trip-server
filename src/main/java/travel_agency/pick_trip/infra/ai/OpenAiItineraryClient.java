@@ -29,13 +29,18 @@ public class OpenAiItineraryClient implements AiItineraryClient {
             다음 제약을 반드시 지키세요.
             - 각 장소의 운영시간(useTime)과 휴무일(restDate)을 고려해 방문 시간대를 배치합니다.
             - 좌표(latitude, longitude)를 활용해 하루 안의 이동 동선이 자연스럽도록 인접한 장소를 묶습니다.
-            - 우선순위(priority)가 MUST_VISIT 인 장소는 반드시 포함하고 우선 배치합니다.
-            - 동행 조건(companions)을 고려해 걷기 부담·실내외 비율을 조정합니다.
+            - 우선순위가 "꼭 가기"인 장소는 반드시 포함하고 우선 배치합니다.
+            - 동행·여행 스타일 조건을 고려해 걷기 부담·실내외 비율을 조정합니다.
             - 여행 기간(duration)에 맞춰 일차(dayIndex)를 1부터 나눕니다.
 
-            각 장소 배치마다 한국어로 배치 이유(reason)를 한 문장으로 작성하세요.
-            예: "축제 운영시간이 오전 10시부터라서 1일차 오전에 배치했습니다."
-            응답에는 입력으로 받은 contentId 만 사용하세요.
+            각 장소 배치마다 한국어로 배치 이유(reason)를 작성하세요. reason 규칙:
+            - 한국어 완결 문장 한 개로, 문장부호로 끝맺습니다.
+              예: "축제 운영시간이 오전 10시부터라서 1일차 오전에 배치했습니다."
+            - contentId, 영문 코드, 괄호 안 숫자 ID를 절대 포함하지 마세요.
+            - 다른 장소를 언급할 때는 장소 이름만 씁니다. 예: "슬로시티"(O), "슬로시티(773075)"(X).
+            - 동행·스타일 조건은 입력에 제공된 한국어 표현만 씁니다. 예: "걷기 적게"(O), "LESS_WALKING"(X).
+
+            응답의 각 항목 contentId 에는 입력으로 받은 contentId 값만 사용하세요.
             """;
 
     private final ChatClient chatClient;
@@ -74,23 +79,25 @@ public class OpenAiItineraryClient implements AiItineraryClient {
     /**
      * 여행 조건과 장소 목록을 사용자 프롬프트 텍스트로 직렬화한다.
      * 운영시간·휴무일·좌표 등 상세가 없는 장소는 해당 항목을 생략한다.
+     * 동행·우선순위는 한국어 라벨로 전달되며, 장소명과 contentId 는 별도 줄로 분리해
+     * 모델이 "이름(contentId)" 형태로 인용하지 못하게 한다.
      */
-    private String buildUserPrompt(AiItineraryRequest request) {
+    String buildUserPrompt(AiItineraryRequest request) {
         StringBuilder sb = new StringBuilder();
         sb.append("[여행 조건]\n");
         sb.append("- 지역: ").append(nullToDash(request.regionName())).append('\n');
         sb.append("- 여행 시작일: ").append(request.travelDate() == null ? "-" : request.travelDate()).append('\n');
         sb.append("- 기간(일): ").append(nullToDash(request.duration())).append('\n');
-        sb.append("- 동행 조건: ")
-                .append(request.companions() == null || request.companions().isEmpty() ? "-" : request.companions())
+        sb.append("- 동행·스타일 조건: ")
+                .append(request.companions() == null || request.companions().isEmpty()
+                        ? "-" : String.join(", ", request.companions()))
                 .append('\n');
 
         sb.append("\n[선택한 장소 목록]\n");
         int index = 1;
         for (AiPlace place : request.places()) {
-            sb.append(index++).append(". ")
-                    .append(nullToDash(place.title()))
-                    .append(" (contentId=").append(place.contentId()).append(")\n");
+            sb.append(index++).append(". ").append(nullToDash(place.title())).append('\n');
+            appendIfPresent(sb, "   - contentId", place.contentId());
             appendIfPresent(sb, "   - 분류", place.category());
             appendIfPresent(sb, "   - 우선순위", place.priority());
             appendCoordinates(sb, place);

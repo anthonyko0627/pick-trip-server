@@ -217,6 +217,33 @@ class ItineraryServiceTest {
             assertThat(request.places()).hasSize(2);
             assertThat(request.places().get(0).latitude()).isEqualTo(35.0);
             assertThat(request.regionName()).isEqualTo("하동");
+            assertThat(request.companions()).containsExactly("아이와 함께");
+            assertThat(request.places().get(0).priority()).isEqualTo("꼭 가기");
+        }
+
+        @Test
+        @DisplayName("AI 배치 이유에 새어 나온 contentId·enum 코드를 응답에서 제거한다")
+        void sanitizesLeakedInternalValuesInReason() {
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(new AiItineraryResult(
+                    "하동 1박 2일 가족 여행",
+                    List.of(new AiDay(1, List.of(
+                            new AiItem("c1", 1, "슬로시티(773075)와 가깝고 LESS_WALKING 조건이라 먼저 배치했습니다."),
+                            new AiItem("c2", 2, "동선상 인접해 오후에 배치했습니다.")
+                    )))
+            ));
+
+            ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+            String firstReason = response.days().get(0).items().get(0).reason();
+            assertThat(firstReason)
+                    .doesNotContain("773075")
+                    .doesNotContain("LESS_WALKING")
+                    .contains("슬로시티")
+                    .contains("걷기 적게");
         }
 
         @Test
