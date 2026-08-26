@@ -1,5 +1,6 @@
 package travel_agency.pick_trip.domain.itinerary.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -25,4 +26,10 @@ public interface ItineraryRepository extends JpaRepository<Itinerary, UUID> {
     @EntityGraph(attributePaths = {"days"})
     @Query("select i from Itinerary i where i.itineraryId = :itineraryId")
     Optional<Itinerary> findWithDaysById(@Param("itineraryId") UUID itineraryId);
+
+    /**
+     * 사용자의 일정 목록을 최근 수정 순으로 조회한다.
+     * 목록은 요약 정보만 필요하므로 {@code days} 를 fetch 하지 않는다 (지연 로딩 유지).
+     */
+    List<Itinerary> findByUserIdOrderByLastModifiedAtDesc(UUID userId);
 }

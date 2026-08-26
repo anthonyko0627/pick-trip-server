@@ -416,7 +416,7 @@ public record ContentDetailResponse(Long id, String name, String region) { }
 1. PR 생성 후 팀원에게 리뷰를 요청합니다.
 2. 리뷰어는 코드 스타일뿐 아니라 로직, 성능, 유지보수성도 함께 검토합니다.
 3. 코멘트는 구체적으로 작성하고 감정적인 표현은 지양합니다.
-4. 모든 코멘트가 해결되면 `main`으로 **Rebase Merge** 합니다.
+4. 모든 코멘트가 해결되면 `main`으로 **Merge Commit** 합니다.
 
 ### 병합 기준
 
