@@ -128,12 +128,13 @@ class TourApiContentMapperTest {
                                     new TourApiDetailIntroResponse.Items(List.of(
                                             new TourApiDetailIntroResponse.Item(
                                                     "2741429", "12",
-                                                    "03:00~18:00", "연중무휴",
+                                                    "03:00~18:00", "연중무휴", "가능",
                                                     null, null, null,
-                                                    null, null,
-                                                    null, null,
-                                                    null, null,
-                                                    "가능", "성인 3,000원",
+                                                    null,
+                                                    null, null, null,
+                                                    null, null, null, null,
+                                                    null, null, null,
+                                                    "성인 3,000원",
                                                     "불가", "불가"
                                             )
                                     ))
