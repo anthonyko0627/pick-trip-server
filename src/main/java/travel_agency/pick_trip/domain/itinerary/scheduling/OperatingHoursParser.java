@@ -17,11 +17,18 @@ public final class OperatingHoursParser {
     private static final Pattern HTML_TAG = Pattern.compile("<[^>]*>");
 
     /**
+     * 범위를 잇는 물결·붙임표. 지자체 원문이 제각각이라 실데이터에서 확인된 변형을 모두 받는다.
+     * U+223C(∼ 수학 기호)는 예천온천 usetime 처럼 실제로 쓰이는데 흔히 빠뜨린다.
+     */
+    private static final String DASH = "[~\\-‐‑‒–—―－～∼〜]";
+
+    /**
      * "09:00~18:00", "9:00 - 18:00", "09시~18시" 계열을 한 번에 잡는다.
      * 시·분 구분자 없이 "9~18" 처럼 쓰인 경우는 가격·인원수와 구별할 수 없어 일부러 매칭하지 않는다.
      */
     private static final Pattern TIME_RANGE = Pattern.compile(
-            "(\\d{1,2})\\s*(?::\\s*(\\d{1,2})|시)\\s*[~\\-－–—～]\\s*(\\d{1,2})\\s*(?::\\s*(\\d{1,2})|시)");
+            "(\\d{1,2})\\s*(?::\\s*(\\d{1,2})|시)\\s*" + DASH
+                    + "\\s*(\\d{1,2})\\s*(?::\\s*(\\d{1,2})|시)");
 
     /** 시각 제약이 없음을 명시한 표현. 인식은 성공한 것이므로 parsed 는 true 가 된다. */
     private static final Pattern ALWAYS_OPEN = Pattern.compile("상시개방|상시\\s*운영|24\\s*시간|연중\\s*무휴|제한\\s*없음");
@@ -30,10 +37,16 @@ public final class OperatingHoursParser {
     private static final Pattern NO_REST = Pattern.compile("연중\\s*무휴|휴무\\s*없음|휴무일\\s*없음|쉬는\\s*날\\s*없음|^\\s*(없음|-|없슴)\\s*$");
 
     /**
-     * "매월 첫째주 월요일", "격주 화요일" 같은 월간·격주 규칙.
+     * "매월 첫째주 월요일", "매달 2, 4주째 일요일", "격주 화요일" 같은 월간·격주 규칙.
      * 매주 단위로 환원할 수 없어 휴무 요일로 확정하면 오히려 잘못된 일정이 나오므로 통째로 포기한다.
+     * 서수를 하나씩 나열하면 반드시 빠뜨린다("다섯번째"를 놓쳐 매주 일요일 휴무로 확정한 적이 있다).
      */
-    private static final Pattern NON_WEEKLY_RULE = Pattern.compile("매월|격주|첫째|둘째|셋째|넷째|다섯째|마지막|첫\\s*번째|두\\s*번째|세\\s*번째|네\\s*번째|홀수|짝수");
+    private static final Pattern NON_WEEKLY_RULE = Pattern.compile(
+            "매월|매달|격주|홀수|짝수|마지막"
+                    // 첫째 / 첫번째 / 다섯번째 … 한글 서수를 접미사 형태와 무관하게 잡는다.
+                    + "|(?:첫|둘|두|셋|세|넷|네|다섯|여섯|일곱)\\s*(?:번)?\\s*째"
+                    // "2, 4주째", "둘째 주", "3번째" 같은 숫자 서수.
+                    + "|\\d+\\s*(?:주\\s*째|번\\s*째|째\\s*주)");
 
     private static final Pattern DAY_WITH_SUFFIX = Pattern.compile("([월화수목금토일])요일");
 
@@ -51,11 +64,16 @@ public final class OperatingHoursParser {
     /** "화요일~일요일 정상 운영" 처럼 **영업일**을 나열한 절. 여기 있는 요일은 휴무가 아니다. */
     private static final Pattern OPEN_KEYWORD = Pattern.compile("정상|운영|영업|개관|개장|오픈|관람\\s*가능");
 
-    /** "화요일~일요일" 같은 요일 범위는 영업일 나열이지 휴무 목록이 아니다. */
-    private static final Pattern DAY_RANGE = Pattern.compile("[월화수목금토일](?:요일)?\\s*[~\\-－–—～]\\s*[월화수목금토일]");
+    /**
+     * "화요일~일요일" 같은 요일 범위. 영업 키워드와 함께 쓰이면 영업일 나열이고,
+     * restDate 문맥에서 영업 키워드 없이 쓰이면 휴무 범위다("매주 화요일~수요일").
+     */
+    private static final Pattern DAY_RANGE = Pattern.compile(
+            "([월화수목금토일])(?:요일)?\\s*" + DASH + "\\s*([월화수목금토일])(?:요일)?");
 
     /** 휴게시간·매표시간이 운영시간보다 앞에 적힌 경우 그것을 개장~폐장으로 오인하지 않도록 거른다. */
-    private static final Pattern BREAK_HINT = Pattern.compile("휴게|브레이크|점심|중식|석식|식사|매표|발권|접수|입장\\s*마감");
+    private static final Pattern BREAK_HINT = Pattern.compile(
+            "휴게|브레이크|점심|중식|석식|식사|준비\\s*시간|매표|발권|접수|입장\\s*마감");
 
     /** "매주 월", "매주 월/화" 처럼 '요일' 접미사가 생략된 나열. '매일'·'매월'의 월/일과 섞이지 않도록 '매주' 뒤에서만 읽는다. */
     private static final Pattern WEEKLY_SHORT = Pattern.compile("매주\\s*((?:[월화수목금토일][\\s,·/및~와과]*)+)");
@@ -158,8 +176,9 @@ public final class OperatingHoursParser {
             int to = last ? text.length() : delimiter.start();
             String segment = text.substring(from, to);
             boolean closing = CLOSE_KEYWORD.matcher(segment).find();
-            boolean describesOpenDays = !closing
-                    && (OPEN_KEYWORD.matcher(segment).find() || DAY_RANGE.matcher(segment).find());
+            // 요일 범위만으로는 영업일인지 휴무인지 알 수 없다. restDate 문맥이므로
+            // 영업을 명시한 구간만 버리고, 나머지 범위는 휴무 범위로 읽는다.
+            boolean describesOpenDays = !closing && OPEN_KEYWORD.matcher(segment).find();
             // 월간·격주 규칙은 구간 단위로만 버린다. 문장 전체를 버리면 같이 적힌 매주 휴무까지 놓친다.
             if (describesOpenDays || NON_WEEKLY_RULE.matcher(segment).find()) {
                 masked.replace(from, to, " ".repeat(to - from));
@@ -172,6 +191,24 @@ public final class OperatingHoursParser {
     }
 
     private static void collectDays(String clause, Set<DayOfWeek> days) {
+        // "매주 화요일~수요일" 은 화·수 이틀 휴무다. 양 끝만 담으면 사이 요일을 놓친다.
+        Matcher range = DAY_RANGE.matcher(clause);
+        while (range.find()) {
+            DayOfWeek start = DAY_BY_CHAR.get(range.group(1).charAt(0));
+            DayOfWeek end = DAY_BY_CHAR.get(range.group(2).charAt(0));
+            if (start == null || end == null) {
+                continue;
+            }
+            // "토요일~월요일" 처럼 주말을 가로지르면 한 바퀴 돈다. 7회로 끊어 무한 순회를 막는다.
+            DayOfWeek cursor = start;
+            for (int i = 0; i < DayOfWeek.values().length; i++) {
+                days.add(cursor);
+                if (cursor == end) {
+                    break;
+                }
+                cursor = cursor.plus(1);
+            }
+        }
         Matcher withSuffix = DAY_WITH_SUFFIX.matcher(clause);
         while (withSuffix.find()) {
             days.add(DAY_BY_CHAR.get(withSuffix.group(1).charAt(0)));
