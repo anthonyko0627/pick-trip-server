@@ -1,6 +1,9 @@
 package travel_agency.pick_trip.domain.share.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import travel_agency.pick_trip.domain.itinerary.entity.Itinerary;
 import travel_agency.pick_trip.domain.region.Region;
@@ -19,7 +22,9 @@ public record SharedItineraryResponse(
 
     public record Day(
             int dayIndex,
-            List<Item> items
+            List<Item> items,
+            Integer totalTravelMinutes,
+            BigDecimal totalTravelKm
     ) {
     }
 
@@ -27,7 +32,10 @@ public record SharedItineraryResponse(
             String contentId,
             String title,
             int order,
-            String reason
+            String reason,
+            // jackson 시간 모듈 기본값은 LocalTime 을 배열/객체로 직렬화하므로, 계약을 "HH:mm" 문자열로 못박는다.
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm") LocalTime startTime,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm") LocalTime endTime
     ) {
     }
 
@@ -40,9 +48,13 @@ public record SharedItineraryResponse(
                                         item.getContentId(),
                                         item.getTitle(),
                                         item.getOrderIndex(),
-                                        item.getReason()
+                                        item.getReason(),
+                                        item.getVisitStart(),
+                                        item.getVisitEnd()
                                 ))
-                                .toList()
+                                .toList(),
+                        day.getTravelMinutes(),
+                        day.getTravelKm()
                 ))
                 .toList();
 

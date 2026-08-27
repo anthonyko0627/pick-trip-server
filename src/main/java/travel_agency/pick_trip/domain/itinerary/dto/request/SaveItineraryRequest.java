@@ -1,10 +1,13 @@
 package travel_agency.pick_trip.domain.itinerary.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import travel_agency.pick_trip.domain.region.Region;
 
@@ -22,7 +25,9 @@ public record SaveItineraryRequest(
 
     public record DayRequest(
             @NotNull Integer dayIndex,
-            @NotEmpty @Valid List<ItemRequest> items
+            @NotEmpty @Valid List<ItemRequest> items,
+            Integer totalTravelMinutes,
+            BigDecimal totalTravelKm
     ) {
     }
 
@@ -31,7 +36,10 @@ public record SaveItineraryRequest(
             String title,
             int order,
             String reason,
-            boolean pinned
+            boolean pinned,
+            // 미리보기 응답과 동일한 "HH:mm" 문자열을 그대로 되돌려받기 위해 역직렬화 형식을 고정한다.
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm") LocalTime startTime,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm") LocalTime endTime
     ) {
     }
 }

@@ -7,11 +7,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.MockedStatic;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import travel_agency.pick_trip.domain.basket.entity.Basket;
@@ -41,6 +45,7 @@ import travel_agency.pick_trip.domain.itinerary.entity.Itinerary;
 import travel_agency.pick_trip.domain.itinerary.entity.ItineraryDay;
 import travel_agency.pick_trip.domain.itinerary.entity.ItineraryItem;
 import travel_agency.pick_trip.domain.itinerary.repository.ItineraryRepository;
+import travel_agency.pick_trip.domain.itinerary.scheduling.ItineraryPlanner;
 import travel_agency.pick_trip.domain.region.Region;
 import travel_agency.pick_trip.domain.share.entity.ShareToken;
 import travel_agency.pick_trip.domain.share.repository.ShareTokenRepository;
@@ -132,9 +137,13 @@ class ItineraryServiceTest {
         return new SaveItineraryRequest(
                 "새 제목", Region.HADONG, LocalDate.of(2026, 7, 1), 2,
                 List.of(new SaveItineraryRequest.DayRequest(1, List.of(
-                        new SaveItineraryRequest.ItemRequest("c1", "title-c1", 1, "이유1", true),
-                        new SaveItineraryRequest.ItemRequest("c2", "title-c2", 2, "이유2", false)
-                )))
+                        new SaveItineraryRequest.ItemRequest(
+                                "c1", "title-c1", 1, "이유1", true,
+                                LocalTime.of(9, 0), LocalTime.of(10, 30)),
+                        new SaveItineraryRequest.ItemRequest(
+                                "c2", "title-c2", 2, "이유2", false,
+                                LocalTime.of(11, 0), LocalTime.of(12, 30))
+                ), 25, new BigDecimal("12.30")))
         );
     }
 
@@ -247,6 +256,76 @@ class ItineraryServiceTest {
         }
 
         @Test
+        @DisplayName("생성 결과의 각 장소에 방문 시각이 배정되고 첫 스톱은 09:00에 시작한다")
+        void assignsVisitTimes() {
+            // given
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(twoPlaceResult());
+
+            // when
+            ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+            // then
+            List<ItineraryGenerateResponse.Item> items = response.days().get(0).items();
+            assertThat(items.get(0).startTime()).isEqualTo(LocalTime.of(9, 0));
+            assertThat(items).allSatisfy(item -> {
+                assertThat(item.startTime()).isNotNull();
+                assertThat(item.endTime()).isNotNull();
+            });
+        }
+
+        @Test
+        @DisplayName("스케줄링이 실패해도 예외 없이 AI 순서 그대로 미리보기를 반환한다")
+        void schedulingFails_fallsBackToAiOrder() {
+            // given
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(twoPlaceResult());
+
+            try (MockedStatic<ItineraryPlanner> planner = mockStatic(ItineraryPlanner.class)) {
+                planner.when(() -> ItineraryPlanner.plan(any(), any(), any(), any(), any()))
+                        .thenThrow(new IllegalStateException("스케줄링 붕괴"));
+
+                // when
+                ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+                // then
+                assertThat(response.title()).isEqualTo("하동 1박 2일 가족 여행");
+                assertThat(response.days().get(0).items())
+                        .extracting(ItineraryGenerateResponse.Item::contentId)
+                        .containsExactly("c1", "c2");
+                assertThat(response.days().get(0).items().get(0).startTime()).isNull();
+                assertThat(response.adjustments()).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("AI가 바구니에 없는 장소만 반환하면 해당 일차를 비운다")
+        void unknownContentIds_areFilteredOut() {
+            // given
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(new AiItineraryResult(
+                    "지어낸 일정",
+                    List.of(new AiDay(1, List.of(new AiItem("없는-장소", 1, "환각"))))
+            ));
+
+            // when
+            ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+            // then
+            assertThat(response.days()).hasSize(1);
+            assertThat(response.days().get(0).items()).isEmpty();
+        }
+
+        @Test
         @DisplayName("콘텐츠 상세 조회가 실패해도 바구니 스냅샷만으로 AI를 호출한다")
         void detailFails_fallsBackToSnapshot() {
             Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
@@ -286,9 +365,11 @@ class ItineraryServiceTest {
             assertThat(response.days().get(0).items())
                     .extracting(ItineraryGenerateResponse.Item::contentId)
                     .containsExactly("c1", "c2");
+            // 스케줄러가 순서를 다시 정하므로 AI 원본 번호(1, 3)가 아니라 1부터 다시 매겨진다.
+            // 걸러낸 자리에 구멍이 남지 않고, 재정렬이 일어나도 번호가 실제 방문 순서와 일치한다.
             assertThat(response.days().get(0).items())
                     .extracting(ItineraryGenerateResponse.Item::order)
-                    .containsExactly(1, 3);
+                    .containsExactly(1, 2);
         }
 
         @Test
@@ -351,6 +432,8 @@ class ItineraryServiceTest {
             assertThat(response.days().get(0).items()).hasSize(2);
             assertThat(response.days().get(0).items().get(0).contentId()).isEqualTo("c1");
             assertThat(response.days().get(0).items().get(0).pinned()).isTrue();
+            assertThat(response.days().get(0).items().get(0).startTime()).isEqualTo(LocalTime.of(9, 0));
+            assertThat(response.days().get(0).totalTravelMinutes()).isEqualTo(25);
             verify(itineraryRepository).save(any(Itinerary.class));
         }
     }
