@@ -118,7 +118,10 @@ class TourApiContentMapperTest {
                             )
                     )
             );
-            // TourApiDetailIntroResponse.Item 필드 순서: contentid, contenttypeid, usetime, restdate, parking, usefee, chkbabycarriage, chkpet
+            // TourApiDetailIntroResponse.Item 필드 순서: contentid, contenttypeid,
+            // usetime, restdate, usetimeculture, restdateculture, playtime,
+            // usetimeleports, restdateleports, opentime, restdateshopping,
+            // opentimefood, restdatefood, parking, usefee, chkbabycarriage, chkpet
             TourApiDetailIntroResponse intro = new TourApiDetailIntroResponse(
                     new TourApiDetailIntroResponse.Response(
                             new TourApiDetailIntroResponse.Body(
@@ -126,6 +129,10 @@ class TourApiContentMapperTest {
                                             new TourApiDetailIntroResponse.Item(
                                                     "2741429", "12",
                                                     "03:00~18:00", "연중무휴",
+                                                    null, null, null,
+                                                    null, null,
+                                                    null, null,
+                                                    null, null,
                                                     "가능", "성인 3,000원",
                                                     "불가", "불가"
                                             )
