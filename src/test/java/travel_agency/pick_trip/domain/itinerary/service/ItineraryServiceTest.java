@@ -226,6 +226,33 @@ class ItineraryServiceTest {
             assertThat(request.places()).hasSize(2);
             assertThat(request.places().get(0).latitude()).isEqualTo(35.0);
             assertThat(request.regionName()).isEqualTo("하동");
+            assertThat(request.companions()).containsExactly("아이와 함께");
+            assertThat(request.places().get(0).priority()).isEqualTo("꼭 가기");
+        }
+
+        @Test
+        @DisplayName("AI 배치 이유에 새어 나온 contentId·enum 코드를 응답에서 제거한다")
+        void sanitizesLeakedInternalValuesInReason() {
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(new AiItineraryResult(
+                    "하동 1박 2일 가족 여행",
+                    List.of(new AiDay(1, List.of(
+                            new AiItem("c1", 1, "슬로시티(773075)와 가깝고 LESS_WALKING 조건이라 먼저 배치했습니다."),
+                            new AiItem("c2", 2, "동선상 인접해 오후에 배치했습니다.")
+                    )))
+            ));
+
+            ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+            String firstReason = response.days().get(0).items().get(0).reason();
+            assertThat(firstReason)
+                    .doesNotContain("773075")
+                    .doesNotContain("LESS_WALKING")
+                    .contains("슬로시티")
+                    .contains("걷기 적게");
         }
 
         @Test
@@ -315,6 +342,57 @@ class ItineraryServiceTest {
             verify(aiItineraryClient).generate(captor.capture());
             assertThat(captor.getValue().places().get(0).latitude()).isNull();
             assertThat(captor.getValue().places().get(0).category()).isEqualTo("12");
+        }
+
+        @Test
+        @DisplayName("AI 응답에 바구니에 없는 contentId가 섞이면 해당 항목을 제외한다")
+        void unknownContentId_isFilteredOut() {
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(new AiItineraryResult(
+                    "하동 1박 2일 가족 여행",
+                    List.of(new AiDay(1, List.of(
+                            new AiItem("c1", 1, "바구니에 있는 장소입니다."),
+                            new AiItem("ghost-99", 2, "AI가 지어낸 장소입니다."),
+                            new AiItem("c2", 3, "바구니에 있는 장소입니다.")
+                    )))
+            ));
+
+            ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+            assertThat(response.days().get(0).items())
+                    .extracting(ItineraryGenerateResponse.Item::contentId)
+                    .containsExactly("c1", "c2");
+            // 스케줄러가 순서를 다시 정하므로 AI 원본 번호(1, 3)가 아니라 1부터 다시 매겨진다.
+            // 걸러낸 자리에 구멍이 남지 않고, 재정렬이 일어나도 번호가 실제 방문 순서와 일치한다.
+            assertThat(response.days().get(0).items())
+                    .extracting(ItineraryGenerateResponse.Item::order)
+                    .containsExactly(1, 2);
+        }
+
+        @Test
+        @DisplayName("일차의 모든 항목이 바구니에 없으면 빈 일차로 남긴다 (구조는 그대로)")
+        void allItemsUnknown_keepsEmptyDay() {
+            Basket basket = basketWith(Region.HADONG, 2, "c1", "c2");
+            given(basketRepository.findByUserId(USER_ID)).willReturn(Optional.of(basket));
+            given(contentService.getContentDetail(anyString()))
+                    .willAnswer(invocation -> detail(invocation.getArgument(0)));
+            given(aiItineraryClient.generate(any())).willReturn(new AiItineraryResult(
+                    "하동 1박 2일 가족 여행",
+                    List.of(
+                            new AiDay(1, List.of(new AiItem("c1", 1, "바구니에 있는 장소입니다."))),
+                            new AiDay(2, List.of(new AiItem("ghost-1", 1, "지어낸 장소"), new AiItem("ghost-2", 2, "지어낸 장소")))
+                    )
+            ));
+
+            ItineraryGenerateResponse response = itineraryService.generate(USER_ID);
+
+            assertThat(response.days()).hasSize(2);
+            assertThat(response.days().get(0).items()).extracting(ItineraryGenerateResponse.Item::contentId)
+                    .containsExactly("c1");
+            assertThat(response.days().get(1).items()).isEmpty();
         }
 
         @Test
