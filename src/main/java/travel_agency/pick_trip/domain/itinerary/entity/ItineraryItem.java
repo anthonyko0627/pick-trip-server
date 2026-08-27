@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalTime;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -51,13 +52,23 @@ public class ItineraryItem {
     @Column(name = "is_pinned", nullable = false)
     private boolean pinned;
 
+    // 스케줄러가 계산한 방문 시각. AI 응답에 시각이 없거나 좌표 미상이면 채우지 않으므로 nullable 이다.
+    @Column(name = "visit_start")
+    private LocalTime visitStart;
+
+    @Column(name = "visit_end")
+    private LocalTime visitEnd;
+
     @Builder
-    private ItineraryItem(String contentId, String title, int orderIndex, String reason, boolean pinned) {
+    private ItineraryItem(String contentId, String title, int orderIndex, String reason, boolean pinned,
+                          LocalTime visitStart, LocalTime visitEnd) {
         this.contentId = contentId;
         this.title = title;
         this.orderIndex = orderIndex;
         this.reason = reason;
         this.pinned = pinned;
+        this.visitStart = visitStart;
+        this.visitEnd = visitEnd;
     }
 
     void assignDay(ItineraryDay day) {
