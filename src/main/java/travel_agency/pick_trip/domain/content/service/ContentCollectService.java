@@ -137,8 +137,8 @@ public class ContentCollectService {
             detail.updateIntro(
                     intro.resolvedUseTime(),
                     intro.resolvedRestDate(),
-                    intro.parking(),
-                    intro.chkbabycarriage(),
+                    intro.resolvedParking(),
+                    intro.resolvedBabyCarriage(),
                     intro.chkpet(),
                     intro.usefee()
             );

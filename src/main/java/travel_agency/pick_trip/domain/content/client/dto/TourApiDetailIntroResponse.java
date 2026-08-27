@@ -28,21 +28,27 @@ public record TourApiDetailIntroResponse(Response response) {
             // 12 관광지
             String usetime,
             String restdate,
+            String parking,
             // 14 문화시설
             String usetimeculture,
             String restdateculture,
-            // 15 축제 (usetimefestival 은 시각이 아니라 요금이 들어오므로 쓰지 않는다)
+            String parkingculture,
+            // 15 축제 (usetimefestival 은 시각이 아니라 요금이 들어오므로 쓰지 않는다.
+            // parkingfestival 은 응답에 나타나지 않아 받지 않는다)
             String playtime,
             // 28 레포츠
             String usetimeleports,
             String restdateleports,
+            String parkingleports,
             // 38 쇼핑
             String opentime,
             String restdateshopping,
+            String parkingshopping,
+            String chkbabycarriageshopping,
             // 39 음식점
             String opentimefood,
             String restdatefood,
-            String parking,
+            String parkingfood,
             String usefee,
             String chkbabycarriage,
             String chkpet
@@ -63,6 +69,20 @@ public record TourApiDetailIntroResponse(Response response) {
          */
         public String resolvedRestDate() {
             return firstNonBlank(restdate, restdateculture, restdatefood, restdateshopping, restdateleports);
+        }
+
+        /**
+         * 타입별 주차 가능 여부 필드 중 실제로 채워진 값을 고른다.
+         * {@code parkingfee}·{@code parkingfeeleports}("무료")는 주차 <em>요금</em>이라 제외한다.
+         * 섞으면 "주차 가능?" 자리에 "무료"가 들어간다.
+         */
+        public String resolvedParking() {
+            return firstNonBlank(parking, parkingculture, parkingfood, parkingshopping, parkingleports);
+        }
+
+        /** 유모차 대여 가능 여부. 쇼핑(38)만 필드명이 다르다. */
+        public String resolvedBabyCarriage() {
+            return firstNonBlank(chkbabycarriage, chkbabycarriageshopping);
         }
 
         private static String firstNonBlank(String... candidates) {
