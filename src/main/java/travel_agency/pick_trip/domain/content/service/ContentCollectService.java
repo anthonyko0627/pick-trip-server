@@ -135,8 +135,8 @@ public class ContentCollectService {
                 content.assignDetail(detail);
             }
             detail.updateIntro(
-                    intro.usetime(),
-                    intro.restdate(),
+                    intro.resolvedUseTime(),
+                    intro.resolvedRestDate(),
                     intro.parking(),
                     intro.chkbabycarriage(),
                     intro.chkpet(),

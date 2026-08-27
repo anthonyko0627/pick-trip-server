@@ -91,7 +91,10 @@ class ContentCollectServiceTest {
         return new TourApiDetailIntroResponse(new TourApiDetailIntroResponse.Response(
                 new TourApiDetailIntroResponse.Body(new TourApiDetailIntroResponse.Items(List.of(
                         new TourApiDetailIntroResponse.Item(
-                                CONTENT_ID, "12", "09:00~18:00", "연중무휴", "가능", "무료", "가능", "불가"))))));
+                                CONTENT_ID, "12", "09:00~18:00", "연중무휴",
+                                // 14/15/28/38/39 타입 전용 필드 (관광지 응답에는 비어 온다)
+                                null, null, null, null, null, null, null, null, null,
+                                "가능", "무료", "가능", "불가"))))));
     }
 
     private TourApiDetailImageResponse imageResponse() {
