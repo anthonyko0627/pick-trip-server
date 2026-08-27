@@ -1,13 +1,18 @@
 package travel_agency.pick_trip.domain.itinerary.service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import travel_agency.pick_trip.domain.basket.entity.Basket;
 import travel_agency.pick_trip.domain.basket.entity.BasketItem;
+import travel_agency.pick_trip.domain.basket.entity.TravelCondition;
 import travel_agency.pick_trip.domain.basket.repository.BasketRepository;
 import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse;
 import travel_agency.pick_trip.domain.content.service.ContentService;
@@ -66,12 +71,13 @@ public class ItineraryService {
                 basket.getRegion() == null ? null : basket.getRegion().getName(),
                 basket.getTravelDate(),
                 basket.getDuration(),
-                basket.getCompanions(),
+                basket.getCompanions().stream().map(TravelCondition::getLabel).toList(),
                 places
         );
 
         AiItineraryResult result = aiItineraryClient.generate(request);
-        return ItineraryGenerateResponse.from(basket, result);
+        return ItineraryGenerateResponse.from(basket,
+                sanitizeReasons(filterToBasketContents(result, basket)));
     }
 
     /**
@@ -148,6 +154,64 @@ public class ItineraryService {
 
     // --- 내부 헬퍼 ---
 
+    /**
+     * AI 응답에서 바구니에 담기지 않은 contentId 항목을 제거한다.
+     * 시스템 프롬프트로 "입력 contentId 만 사용" 을 지시하지만 강제가 아니므로,
+     * 모델이 임의의 장소를 섞어 넣더라도 사용자가 담지 않은 장소가 일정에 노출되지 않도록 서버에서 방어한다.
+     * 일차 구성·순서·제목은 그대로 두고 미상 항목만 걷어낸다 (빈 일차도 유지).
+     */
+    private AiItineraryResult filterToBasketContents(AiItineraryResult result, Basket basket) {
+        Set<String> knownContentIds = basket.getItems().stream()
+                .map(BasketItem::getContentId)
+                .collect(Collectors.toSet());
+
+        List<String> removedContentIds = new ArrayList<>();
+        List<AiItineraryResult.AiDay> filteredDays = new ArrayList<>();
+        for (AiItineraryResult.AiDay day : result.days()) {
+            List<AiItineraryResult.AiItem> keptItems = new ArrayList<>();
+            for (AiItineraryResult.AiItem item : day.items()) {
+                if (knownContentIds.contains(item.contentId())) {
+                    keptItems.add(item);
+                } else {
+                    removedContentIds.add(item.contentId());
+                }
+            }
+            filteredDays.add(new AiItineraryResult.AiDay(day.dayIndex(), keptItems));
+        }
+
+        if (!removedContentIds.isEmpty()) {
+            log.warn("AI 일정 응답에서 바구니에 없는 장소 {}건을 제외했습니다. contentIds={}",
+                    removedContentIds.size(), removedContentIds);
+        }
+        return new AiItineraryResult(result.title(), filteredDays);
+    }
+
+    /**
+     * AI 응답의 배치 이유(reason)에서 사용자가 이해할 수 없는 내부 값
+     * (contentId 표기·괄호 안 숫자 ID·동행/우선순위 enum 코드)을 제거·치환한다.
+     * 시스템 프롬프트로 금지를 지시하지만 강제가 아니므로 서버에서 방어한다.
+     */
+    private AiItineraryResult sanitizeReasons(AiItineraryResult result) {
+        int changedCount = 0;
+        List<AiItineraryResult.AiDay> days = new ArrayList<>();
+        for (AiItineraryResult.AiDay day : result.days()) {
+            List<AiItineraryResult.AiItem> items = new ArrayList<>();
+            for (AiItineraryResult.AiItem item : day.items()) {
+                String sanitized = ReasonSanitizer.sanitize(item.reason());
+                if (!Objects.equals(sanitized, item.reason())) {
+                    changedCount++;
+                }
+                items.add(new AiItineraryResult.AiItem(item.contentId(), item.order(), sanitized));
+            }
+            days.add(new AiItineraryResult.AiDay(day.dayIndex(), items));
+        }
+
+        if (changedCount > 0) {
+            log.warn("AI 일정 응답의 배치 이유 {}건에서 내부 값을 제거했습니다.", changedCount);
+        }
+        return new AiItineraryResult(result.title(), days);
+    }
+
     private void validateInput(Basket basket) {
         if (basket.getItems().size() < MIN_CONTENTS
                 || basket.getRegion() == null
@@ -173,7 +237,7 @@ public class ItineraryService {
                             .contentId(item.contentId())
                             .title(item.title())
                             .orderIndex(item.order())
-                            .reason(item.reason())
+                            .reason(ReasonSanitizer.sanitize(item.reason()))
                             .pinned(item.pinned())
                             .build()));
                     return day;
@@ -189,7 +253,7 @@ public class ItineraryService {
                             .contentId(item.contentId())
                             .title(item.title())
                             .orderIndex(item.order())
-                            .reason(item.reason())
+                            .reason(ReasonSanitizer.sanitize(item.reason()))
                             .pinned(false)
                             .build()));
                     return day;
@@ -210,7 +274,7 @@ public class ItineraryService {
                     item.getTitle(),
                     item.getContentTypeId(),
                     null, null, null, null, null,
-                    item.getPriority().name()
+                    item.getPriority().getLabel()
             );
         }
         return new AiPlace(
@@ -222,7 +286,7 @@ public class ItineraryService {
                 detail.useTime(),
                 detail.restDate(),
                 detail.stayDuration(),
-                item.getPriority().name()
+                item.getPriority().getLabel()
         );
     }
 
