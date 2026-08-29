@@ -66,6 +66,8 @@ public class SecurityConfig {
                         // Content - 인증 불필요
                         .requestMatchers(HttpMethod.GET, "/api/v1/contents").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/contents/**").permitAll()
+                        // Home - 홈 화면 조회 인증 불필요
+                        .requestMatchers(HttpMethod.GET, "/api/v1/home").permitAll()
                         // Share - 공유 토큰 조회 인증 불필요
                         .requestMatchers(HttpMethod.GET, "/api/v1/share/**").permitAll()
                         // Basket - 여행 바구니는 로그인 필요
