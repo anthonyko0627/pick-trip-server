@@ -16,6 +16,7 @@ import travel_agency.pick_trip.domain.content.dto.request.ContentListRequest;
 import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentSummaryResponse;
+import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse;
 import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.content.service.ContentService;
 import travel_agency.pick_trip.gloal.error.GlobalExceptionHandler;
@@ -24,7 +25,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -112,6 +115,51 @@ class ContentControllerTest {
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(result.getBody()).isNotNull();
             assertThat(result.getBody().contentId()).isEqualTo("2741429");
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/contents/{contentId}/nearby")
+    class GetNearbyContents {
+
+        @Test
+        @DisplayName("정상 요청이면 200과 NearbyContentResponse를 반환한다")
+        void validRequest_returns200WithNearby() {
+            // given
+            NearbyContentResponse expected = new NearbyContentResponse("111", 5.0, List.of(
+                    new NearbyContentResponse.NearbyContentItem("222", "최참판댁", "12", "하동군 악양면",
+                            "https://img.jpg", 35.13, 127.57, ContentCategory.CULTURE, "토지 배경", "HADONG", 1.23)
+            ));
+            given(contentService.getNearbyContents("111", 5.0, 10)).willReturn(expected);
+
+            // when
+            ResponseEntity<NearbyContentResponse> result = contentController.getNearbyContents("111", 5.0, 10);
+
+            // then
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat(result.getBody()).isNotNull();
+            assertThat(result.getBody().items()).hasSize(1);
+            assertThat(result.getBody().items().get(0).contentId()).isEqualTo("222");
+        }
+
+        @Test
+        @DisplayName("radiusKm·size 파라미터가 없으면 기본값 5km·10개로 위임한다")
+        void missingParams_delegatesWithDefaults() throws Exception {
+            given(contentService.getNearbyContents(eq("111"), eq(5.0), eq(10)))
+                    .willReturn(new NearbyContentResponse("111", 5.0, List.of()));
+
+            mockMvc.perform(get("/api/v1/contents/111/nearby"))
+                    .andExpect(status().isOk());
+
+            verify(contentService).getNearbyContents("111", 5.0, 10);
+        }
+
+        @Test
+        @DisplayName("radiusKm 값이 숫자가 아니면 500이 아닌 400을 반환한다")
+        void nonNumericRadius_returns400NotInternalServerError() throws Exception {
+            mockMvc.perform(get("/api/v1/contents/111/nearby").param("radiusKm", "abc"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
     }
 }

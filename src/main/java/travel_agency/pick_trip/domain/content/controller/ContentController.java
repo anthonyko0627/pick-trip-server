@@ -13,6 +13,7 @@ import travel_agency.pick_trip.domain.content.dto.request.CompanionType;
 import travel_agency.pick_trip.domain.content.dto.request.ContentListRequest;
 import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
+import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse;
 import travel_agency.pick_trip.domain.content.service.ContentService;
 
 @Validated
@@ -40,5 +41,14 @@ public class ContentController {
     @GetMapping("/{contentId}")
     public ResponseEntity<ContentDetailResponse> getContentDetail(@PathVariable String contentId) {
         return ResponseEntity.ok(contentService.getContentDetail(contentId));
+    }
+
+    @GetMapping("/{contentId}/nearby")
+    public ResponseEntity<NearbyContentResponse> getNearbyContents(
+            @PathVariable String contentId,
+            @RequestParam(defaultValue = "5") double radiusKm,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ResponseEntity.ok(contentService.getNearbyContents(contentId, radiusKm, size));
     }
 }
