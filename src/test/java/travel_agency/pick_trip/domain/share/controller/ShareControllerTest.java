@@ -1,7 +1,9 @@
 package travel_agency.pick_trip.domain.share.controller;
 
 import io.jsonwebtoken.Claims;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -77,8 +79,10 @@ class ShareControllerTest {
             SharedItineraryResponse expected = new SharedItineraryResponse(
                     "하동 1박 2일", Region.HADONG, LocalDate.of(2026, 7, 1), 2,
                     List.of(new SharedItineraryResponse.Day(1, List.of(
-                            new SharedItineraryResponse.Item("c1", "쌍계사", 1, "오전 배치")
-                    )))
+                            new SharedItineraryResponse.Item(
+                                    "c1", "쌍계사", 1, "오전 배치",
+                                    LocalTime.of(9, 0), LocalTime.of(10, 30))
+                    ), 0, BigDecimal.ZERO))
             );
             given(shareService.getSharedItinerary(token)).willReturn(expected);
 

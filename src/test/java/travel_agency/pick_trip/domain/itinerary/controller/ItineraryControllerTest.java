@@ -1,8 +1,10 @@
 package travel_agency.pick_trip.domain.itinerary.controller;
 
 import io.jsonwebtoken.Claims;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -54,8 +56,10 @@ class ItineraryControllerTest {
         return new SaveItineraryRequest(
                 "하동 1박 2일", Region.HADONG, LocalDate.of(2026, 7, 1), 2,
                 List.of(new SaveItineraryRequest.DayRequest(1, List.of(
-                        new SaveItineraryRequest.ItemRequest("c1", "쌍계사", 1, "오전 배치", true)
-                )))
+                        new SaveItineraryRequest.ItemRequest(
+                                "c1", "쌍계사", 1, "오전 배치", true,
+                                LocalTime.of(9, 0), LocalTime.of(10, 30))
+                ), 0, BigDecimal.ZERO))
         );
     }
 
@@ -64,8 +68,10 @@ class ItineraryControllerTest {
                 ITINERARY_ID, title, Region.HADONG, LocalDate.of(2026, 7, 1), 2,
                 LocalDateTime.of(2026, 6, 21, 12, 0),
                 List.of(new ItineraryResponse.Day(UUID.randomUUID(), 1, List.of(
-                        new ItineraryResponse.Item(UUID.randomUUID(), "c1", "쌍계사", 1, "오전 배치", true)
-                )))
+                        new ItineraryResponse.Item(
+                                UUID.randomUUID(), "c1", "쌍계사", 1, "오전 배치", true,
+                                LocalTime.of(9, 0), LocalTime.of(10, 30))
+                ), 0, BigDecimal.ZERO))
         );
     }
 
@@ -80,8 +86,11 @@ class ItineraryControllerTest {
             ItineraryGenerateResponse expected = new ItineraryGenerateResponse(
                     "하동 1박 2일 가족 여행", Region.HADONG, LocalDate.of(2026, 7, 1), 2,
                     List.of(new ItineraryGenerateResponse.Day(1, List.of(
-                            new ItineraryGenerateResponse.Item("c1", "쌍계사", 1, "오전 배치")
-                    )))
+                            new ItineraryGenerateResponse.Item(
+                                    "c1", "쌍계사", 1, "오전 배치",
+                                    LocalTime.of(9, 0), LocalTime.of(10, 30), List.of())
+                    ), LocalDate.of(2026, 7, 1), 0, 0.0, List.of())),
+                    List.of()
             );
             given(itineraryService.generate(USER_UID)).willReturn(expected);
 

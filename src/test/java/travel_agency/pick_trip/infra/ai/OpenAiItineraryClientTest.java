@@ -2,7 +2,6 @@ package travel_agency.pick_trip.infra.ai;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.web.client.ResourceAccessException;
-import travel_agency.pick_trip.domain.basket.entity.TravelCondition;
 import travel_agency.pick_trip.gloal.error.ErrorCode;
 import travel_agency.pick_trip.gloal.error.exception.PickTripException;
 import travel_agency.pick_trip.infra.ai.dto.AiItineraryRequest;
@@ -50,9 +48,9 @@ class OpenAiItineraryClientTest {
                 "하동",
                 LocalDate.of(2026, 7, 1),
                 2,
-                Set.of(TravelCondition.WITH_CHILD),
+                List.of("아이와 함께", "걷기 적게"),
                 List.of(new AiPlace(
-                        "c1", "쌍계사", "12", 35.27, 127.58, "09:00~18:00", "연중무휴", "2시간", "MUST_VISIT"))
+                        "c1", "쌍계사", "12", 35.27, 127.58, "09:00~18:00", "연중무휴", "2시간", "꼭 가기"))
         );
     }
 
@@ -86,6 +84,34 @@ class OpenAiItineraryClientTest {
             assertThat(result.title()).isEqualTo("하동 1박 2일 가족 여행");
             assertThat(result.days()).hasSize(1);
             assertThat(result.days().get(0).items().get(0).contentId()).isEqualTo("c1");
+        }
+    }
+
+    @Nested
+    @DisplayName("buildUserPrompt")
+    class BuildUserPrompt {
+
+        @Test
+        @DisplayName("동행·스타일 조건을 한국어 라벨로 렌더링한다")
+        void rendersConditionsAsKoreanLabels() {
+            // when
+            String prompt = client.buildUserPrompt(request());
+
+            // then
+            assertThat(prompt).contains("아이와 함께").contains("걷기 적게");
+        }
+
+        @Test
+        @DisplayName("장소명과 contentId를 별도 줄로 분리해 이름 옆에 ID가 붙지 않는다")
+        void separatesContentIdFromTitle() {
+            // when
+            String prompt = client.buildUserPrompt(request());
+
+            // then
+            assertThat(prompt)
+                    .doesNotContain("(contentId=")
+                    .contains("쌍계사")
+                    .contains("- contentId: c1");
         }
     }
 

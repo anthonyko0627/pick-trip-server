@@ -12,6 +12,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -49,9 +50,18 @@ public class ItineraryDay {
     @OrderBy("orderIndex ASC")
     private List<ItineraryItem> items = new ArrayList<>();
 
+    // 하루 이동 요약. 좌표가 없는 장소만 있으면 계산 불가하므로 nullable 이다.
+    @Column(name = "travel_minutes")
+    private Integer travelMinutes;
+
+    @Column(name = "travel_km", precision = 6, scale = 2)
+    private BigDecimal travelKm;
+
     @Builder
-    private ItineraryDay(int dayIndex) {
+    private ItineraryDay(int dayIndex, Integer travelMinutes, BigDecimal travelKm) {
         this.dayIndex = dayIndex;
+        this.travelMinutes = travelMinutes;
+        this.travelKm = travelKm;
     }
 
     void assignItinerary(Itinerary itinerary) {
