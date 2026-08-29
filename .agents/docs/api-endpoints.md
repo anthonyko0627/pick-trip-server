@@ -43,8 +43,11 @@
 
 | 메서드 | URL                      | 인증 필요 | 설명                                      |
 | ----- | ------------------------ | :------: | ----------------------------------------- |
-| GET   | `/api/v1/contents`       | X        | 콘텐츠 목록 조회 (지역, 카테고리, 필터 등) |
-| GET   | `/api/v1/contents/{id}`  | X        | 콘텐츠 상세 조회                           |
+| GET   | `/api/v1/contents`            | X        | 콘텐츠 목록 조회 (지역, 카테고리, 필터 등) |
+| GET   | `/api/v1/contents/{id}`       | X        | 콘텐츠 상세 조회                           |
+| GET   | `/api/v1/contents/{id}/nearby` | X       | 해당 콘텐츠 좌표 기준 반경 내 주변 콘텐츠 조회 (거리순) |
+
+`GET /api/v1/contents/{id}/nearby` 는 로컬 적재분(`travel_contents`)만 대상으로 하며, 쿼리 파라미터 `radiusKm`(기본 5, 최대 20)과 `size`(기본 10, 최대 30)를 받는다. 응답 각 항목에 Haversine 근사 거리 `distanceKm`(km)를 포함한다. 기준 콘텐츠가 로컬에 없으면 `CONTENT_NOT_FOUND`, 좌표가 없으면 `CONTENT_LOCATION_UNKNOWN` 을 반환한다.
 
 ## 여행 바구니
 
