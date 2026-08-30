@@ -47,20 +47,21 @@
    - LOCAL:  travelContentRepository.findNearby(...)     — limit 을 size 가 아닌 ROUTE_CANDIDATES
    - TOURAPI: adapter.fetchNearby(...)                   — 내부 numOfRows 를 ROUTE_CANDIDATES 기준으로
    후보가 비면 그대로 빈 응답(폴백 불필요).
-4. RoadDistanceResolver.resolve(originLat, originLng, 후보들):
-   - 후보 상위 ROUTE_CANDIDATES 개만 Kakao 여러목적지 길찾기 1콜
+4. RoadDistanceResolver.resolve(originLat, originLng, 후보들, size):
+   - 좌표 없는 후보 제외 후 직선거리 상위 size 개만 Kakao 여러목적지 길찾기 1콜
+     (radius = 가장 먼 후보를 덮되 10km 상한. "radius is mandatory" 이므로 필수)
    - 목적지별 병합:
        result_code == 0  → distanceKm = distance/1000, durationMinutes = round(duration/60), basis = ROAD
        result_code != 0  → 직선거리 유지, durationMinutes = null,                          basis = STRAIGHT
    - Kakao 호출 자체 실패(4xx/5xx/timeout/파싱) → 후보 전체 basis = STRAIGHT, duration = null (예외 던지지 않음)
-5. basis 무관하게 distanceKm 오름차순 정렬 → 상위 size 개
+5. basis 무관하게 distanceKm 오름차순 정렬
 6. NearbyContentResponse 반환 (source 는 LOCAL/TOURAPI 그대로)
 ```
 
-### 상수
+### 라우팅 개수
 
-- `ROUTE_CANDIDATES = min(size + 5, 20)` — 직선거리 상위 이 개수만 라우팅.
-  Kakao 1콜 상한(30) 이내, 사용량 최소화. size=3 이면 8개만 라우팅.
+정확히 직선거리 상위 `size` 개만 라우팅한다. 프론트가 3~4개만 노출하고 사용량을
+아끼자는 요구에 맞춰 버퍼를 두지 않는다. Kakao 1콜 상한(목적지 30)·radius 상한(10km).
 
 ## 응답 변경 (하위호환 — 필드 추가)
 

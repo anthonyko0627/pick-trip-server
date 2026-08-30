@@ -40,6 +40,7 @@ class ContentServiceTest {
 
     @Mock private TourApiContentAdapter adapter;
     @Mock private TravelContentRepository travelContentRepository;
+    @Mock private RoadDistanceResolver roadDistanceResolver;
     @InjectMocks private ContentService contentService;
 
     @Nested
@@ -135,6 +136,12 @@ class ContentServiceTest {
                     ContentCategory.ATTRACTION, null, "HADONG", distanceKm);
         }
 
+        /** 도로 거리 재정렬은 RoadDistanceResolverTest 가 검증한다. 여기서는 후보를 그대로 통과시킨다. */
+        private void stubRoadPassthrough() {
+            given(roadDistanceResolver.resolve(anyDouble(), anyDouble(), any(), anyInt()))
+                    .willAnswer(invocation -> invocation.getArgument(2));
+        }
+
         @Test
         @DisplayName("로컬 기준 콘텐츠 좌표로 조회한 주변 행이 있으면 LOCAL 소스로 거리순 매핑해 반환한다")
         void localOriginWithNeighbors_returnsLocalSource() {
@@ -148,6 +155,7 @@ class ContentServiceTest {
                             row("333", "평사리 들판", "12", "하동군 악양면", null,
                                     35.20, 127.60, null, null, "HADONG", 4.111)
                     ));
+            stubRoadPassthrough();
 
             // when
             NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
@@ -208,6 +216,7 @@ class ContentServiceTest {
                     .willReturn(List.of());
             given(adapter.fetchNearby(ORIGIN_ID, 35.1234, 127.5678, 5.0, 10))
                     .willReturn(List.of(remoteItem("999", 2.5)));
+            stubRoadPassthrough();
 
             // when
             NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
@@ -225,6 +234,7 @@ class ContentServiceTest {
             given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(35.15, 127.55));
             given(adapter.fetchNearby(ORIGIN_ID, 35.15, 127.55, 5.0, 10))
                     .willReturn(List.of(remoteItem("999", 1.0)));
+            stubRoadPassthrough();
 
             // when
             NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
@@ -260,6 +270,7 @@ class ContentServiceTest {
             given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(35.15, 127.55));
             given(adapter.fetchNearby(ORIGIN_ID, 35.15, 127.55, 5.0, 10))
                     .willReturn(List.of(remoteItem("999", 1.0)));
+            stubRoadPassthrough();
 
             // when
             NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
@@ -314,6 +325,28 @@ class ContentServiceTest {
             // then
             assertThat(result.items()).isEmpty();
             assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.TOURAPI);
+        }
+
+        @Test
+        @DisplayName("후보를 기준 좌표와 함께 RoadDistanceResolver 로 넘기고, 재정렬된 결과를 응답으로 반환한다")
+        void passesCandidatesThroughRoadResolver() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID))
+                    .willReturn(Optional.of(origin(35.1234, 127.5678)));
+            given(travelContentRepository.findNearby(eq(ORIGIN_ID), anyDouble(), anyDouble(), anyDouble(), anyInt()))
+                    .willReturn(List.of(
+                            row("222", "가", "12", "주소", null, 35.13, 127.57, null, null, "HADONG", 1.0),
+                            row("333", "나", "12", "주소", null, 35.20, 127.60, null, null, "HADONG", 2.0)
+                    ));
+            // resolver 가 도로 거리로 순서를 뒤집었다고 가정
+            given(roadDistanceResolver.resolve(eq(35.1234), eq(127.5678), any(), eq(10)))
+                    .willReturn(List.of(remoteItem("333", 1.2), remoteItem("222", 3.4)));
+
+            // when
+            NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
+
+            // then
+            assertThat(result.items()).extracting("contentId").containsExactly("333", "222");
         }
 
         private NearbyContentProjection row(

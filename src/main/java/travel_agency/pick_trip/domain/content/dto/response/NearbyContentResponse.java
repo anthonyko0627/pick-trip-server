@@ -26,6 +26,18 @@ public record NearbyContentResponse(
         TOURAPI
     }
 
+    /**
+     * {@code distanceKm} 산출 기준.
+     * <ul>
+     *   <li>{@code ROAD} — Kakao Mobility 길찾기로 계산한 실제 자동차 도로 거리</li>
+     *   <li>{@code STRAIGHT} — 직선(Haversine) 거리. 길찾기 실패 시 폴백</li>
+     * </ul>
+     */
+    public enum DistanceBasis {
+        ROAD,
+        STRAIGHT
+    }
+
     public record NearbyContentItem(
             String contentId,
             String title,
@@ -37,7 +49,26 @@ public record NearbyContentResponse(
             ContentCategory category,
             String summary,
             String region,
-            double distanceKm
+            double distanceKm,
+            /** 자동차 소요 시간(분). {@code distanceBasis == STRAIGHT} 이면 {@code null}. */
+            Integer durationMinutes,
+            DistanceBasis distanceBasis
     ) {
+
+        /** 도로 거리 계산 전 초기 상태(직선 거리)로 생성한다. */
+        public NearbyContentItem(
+                String contentId, String title, String contentTypeId, String address, String firstImage,
+                double latitude, double longitude, ContentCategory category, String summary, String region,
+                double distanceKm
+        ) {
+            this(contentId, title, contentTypeId, address, firstImage, latitude, longitude,
+                    category, summary, region, distanceKm, null, DistanceBasis.STRAIGHT);
+        }
+
+        /** 거리 관련 필드만 교체한 새 인스턴스를 만든다. */
+        public NearbyContentItem withDistance(double distanceKm, Integer durationMinutes, DistanceBasis distanceBasis) {
+            return new NearbyContentItem(contentId, title, contentTypeId, address, firstImage,
+                    latitude, longitude, category, summary, region, distanceKm, durationMinutes, distanceBasis);
+        }
     }
 }

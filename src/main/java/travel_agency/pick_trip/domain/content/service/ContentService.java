@@ -30,6 +30,7 @@ public class ContentService {
 
     private final TourApiContentAdapter adapter;
     private final TravelContentRepository travelContentRepository;
+    private final RoadDistanceResolver roadDistanceResolver;
 
     public ContentListResponse getContents(ContentListRequest request) {
         Region region = Region.fromCode(request.region());
@@ -48,6 +49,9 @@ public class ContentService {
      * ({@code 기준 콘텐츠 미적재 · 좌표 없음/(0,0) · 주변 로컬 행 0건}) TourAPI {@code locationBasedList2}로 폴백한다.
      * 소스는 섞지 않으며 응답의 {@link NearbySource}로 구분한다. 좌표를 로컬·TourAPI 어디에서도 얻지 못하면
      * {@code CONTENT_LOCATION_UNKNOWN}, TourAPI 가 기준 콘텐츠를 모르면 {@code CONTENT_NOT_FOUND}.
+     *
+     * <p>직선 거리 후보를 {@link RoadDistanceResolver}로 실제 도로 거리로 다시 매겨 정렬한다.
+     * 길찾기 실패 시 직선 거리 순서를 유지한다(항목별 {@code distanceBasis}로 구분).
      */
     public NearbyContentResponse getNearbyContents(String contentId, double radiusKm, int size) {
         double effectiveRadiusKm = clampRadiusKm(radiusKm);
@@ -58,14 +62,16 @@ public class ContentService {
         Double localLng = localOrigin.map(TravelContent::getLongitude).orElse(null);
 
         if (hasUsableCoordinates(localLat, localLng)) {
-            List<NearbyContentItem> localItems = travelContentRepository
+            List<NearbyContentItem> localCandidates = travelContentRepository
                     .findNearby(contentId, localLat, localLng, effectiveRadiusKm, effectiveSize)
                     .stream()
                     .map(ContentService::toItem)
                     .toList();
-            if (!localItems.isEmpty()) {
+            if (!localCandidates.isEmpty()) {
+                List<NearbyContentItem> ranked = roadDistanceResolver
+                        .resolve(localLat, localLng, localCandidates, effectiveSize);
                 return new NearbyContentResponse(
-                        contentId, effectiveRadiusKm, NearbySource.LOCAL, localItems);
+                        contentId, effectiveRadiusKm, NearbySource.LOCAL, ranked);
             }
             return fallbackToProvider(contentId, localLat, localLng, effectiveRadiusKm, effectiveSize);
         }
@@ -82,8 +88,9 @@ public class ContentService {
 
     private NearbyContentResponse fallbackToProvider(
             String originContentId, double lat, double lng, double radiusKm, int size) {
-        List<NearbyContentItem> items = adapter.fetchNearby(originContentId, lat, lng, radiusKm, size);
-        return new NearbyContentResponse(originContentId, radiusKm, NearbySource.TOURAPI, items);
+        List<NearbyContentItem> candidates = adapter.fetchNearby(originContentId, lat, lng, radiusKm, size);
+        List<NearbyContentItem> ranked = roadDistanceResolver.resolve(lat, lng, candidates, size);
+        return new NearbyContentResponse(originContentId, radiusKm, NearbySource.TOURAPI, ranked);
     }
 
     private static boolean hasUsableCoordinates(Double lat, Double lng) {

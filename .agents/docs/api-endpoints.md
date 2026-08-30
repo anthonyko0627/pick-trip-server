@@ -47,7 +47,15 @@
 | GET   | `/api/v1/contents/{id}`       | X        | 콘텐츠 상세 조회                           |
 | GET   | `/api/v1/contents/{id}/nearby` | X       | 해당 콘텐츠 좌표 기준 반경 내 주변 콘텐츠 조회 (거리순) |
 
-`GET /api/v1/contents/{id}/nearby` 는 쿼리 파라미터 `radiusKm`(기본 5, 최대 20)과 `size`(기본 10, 최대 30)를 받고, 응답 각 항목에 거리 `distanceKm`(km)를 포함한다.
+`GET /api/v1/contents/{id}/nearby` 는 쿼리 파라미터 `radiusKm`(기본 5, 최대 20)과 `size`(기본 10, 최대 30)를 받는다.
+
+응답 각 항목의 거리·시간 필드:
+
+- `distanceKm` — 거리(km). `distanceBasis` 로 산출 기준을 구분한다.
+- `distanceBasis` — `ROAD`(Kakao Mobility 길찾기로 계산한 실제 자동차 도로 거리) 또는 `STRAIGHT`(직선 거리, 길찾기 실패 시 폴백).
+- `durationMinutes` — 자동차 소요 시간(분). `distanceBasis` 가 `STRAIGHT` 이면 `null`.
+
+정렬은 항상 `distanceKm` 오름차순이다. 직선 거리로 상위 `size` 개 후보를 추린 뒤 그 후보만 도로 거리를 조회한다(사용량 절약). 길찾기 API 장애 시 직선 거리 정렬로 폴백하며, 목적지별로 경로를 찾지 못한 항목만 `STRAIGHT` 로 표시된다(부분 폴백).
 
 조회 소스는 응답의 `source` 필드로 구분한다.
 
