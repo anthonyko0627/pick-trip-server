@@ -20,8 +20,8 @@ public interface TourApiClient {
 
     @GetMapping("/areaBasedList2")
     TourApiListResponse getAreaBasedList(
-            @RequestParam String areaCode,
-            @RequestParam String sigunguCode,
+            @RequestParam String lDongRegnCd,
+            @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
@@ -30,8 +30,8 @@ public interface TourApiClient {
     @GetMapping("/searchKeyword2")
     TourApiListResponse searchByKeyword(
             @RequestParam String keyword,
-            @RequestParam String areaCode,
-            @RequestParam String sigunguCode,
+            @RequestParam String lDongRegnCd,
+            @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
@@ -53,8 +53,8 @@ public interface TourApiClient {
     @GetMapping("/searchFestival2")
     TourApiFestivalResponse searchFestival(
             @RequestParam String eventStartDate,
-            @RequestParam(required = false) String areaCode,
-            @RequestParam(required = false) String sigunguCode,
+            @RequestParam(required = false) String lDongRegnCd,
+            @RequestParam(required = false) String lDongSignguCd,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
     );
@@ -62,8 +62,8 @@ public interface TourApiClient {
     /** 콘텐츠 변경/삭제 동기화. {@code modifiedtime}(yyyyMMdd) 이후 변경분, {@code showflag}로 노출 여부. */
     @GetMapping("/areaBasedSyncList2")
     TourApiSyncResponse getAreaBasedSyncList(
-            @RequestParam String areaCode,
-            @RequestParam String sigunguCode,
+            @RequestParam String lDongRegnCd,
+            @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
             @RequestParam(required = false) String modifiedtime,
             @RequestParam int pageNo,

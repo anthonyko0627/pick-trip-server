@@ -33,16 +33,16 @@ public class TourApiContentAdapter {
             if (request.keyword() != null && !request.keyword().isBlank()) {
                 raw = tourApiClient.searchByKeyword(
                         request.keyword(),
-                        region.getAreaCode(),
-                        region.getSigunguCode(),
+                        region.getLDongRegnCd(),
+                        region.getLDongSignguCd(),
                         effectiveContentTypeId,
                         pageNo,
                         request.size()
                 );
             } else {
                 raw = tourApiClient.getAreaBasedList(
-                        region.getAreaCode(),
-                        region.getSigunguCode(),
+                        region.getLDongRegnCd(),
+                        region.getLDongSignguCd(),
                         effectiveContentTypeId,
                         pageNo,
                         request.size()

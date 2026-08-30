@@ -100,7 +100,7 @@ class TourApiContentMapperTest {
         @DisplayName("세 API 응답을 병합해 ContentDetailResponse를 반환한다")
         void mergesThreeResponses() {
             // given
-            // TourApiDetailCommonResponse.Item 필드 순서: contentid, contenttypeid, title, addr1, addr2, tel, homepage, mapx, mapy, firstimage, overview, lclsSystm1, lclsSystm2, lclsSystm3, areacode, sigungucode
+            // TourApiDetailCommonResponse.Item 필드 순서: contentid, contenttypeid, title, addr1, addr2, tel, homepage, mapx, mapy, firstimage, overview, lclsSystm1, lclsSystm2, lclsSystm3, lDongRegnCd, lDongSignguCd
             TourApiDetailCommonResponse common = new TourApiDetailCommonResponse(
                     new TourApiDetailCommonResponse.Response(
                             new TourApiDetailCommonResponse.Body(
@@ -112,7 +112,7 @@ class TourApiContentMapperTest {
                                                     "127.58", "35.27",
                                                     "https://img.jpg", "한국의 4대 총림",
                                                     "HS", "HS01", "HS010600",
-                                                    "36", "18"
+                                                    "48", "850"
                                             )
                                     ))
                             )
@@ -167,10 +167,42 @@ class TourApiContentMapperTest {
             assertThat(result.dataSource()).isEqualTo("TourAPI");
             assertThat(result.images()).hasSize(1);
             assertThat(result.images().get(0).imageUrl()).isEqualTo("https://img1.jpg");
-            // lclsSystm1=HS(역사관광) → CULTURE, areacode=36/sigungucode=18 → HADONG
+            // lclsSystm1=HS(역사관광) → CULTURE, lDongRegnCd=48/lDongSignguCd=850 → HADONG
             assertThat(result.category()).isEqualTo(ContentCategory.CULTURE);
             assertThat(result.indoor()).isTrue();
             assertThat(result.region()).isEqualTo("HADONG");
+        }
+
+        @Test
+        @DisplayName("법정동 코드만 달린 콘텐츠도 지역을 역매핑한다")
+        void ldongCodeOnly_resolvesRegion() {
+            // given - 부석사(127669): TourAPI가 legacy areacode/sigungucode를 비우고 법정동 코드만 채워 내려준다
+            TourApiDetailCommonResponse common = new TourApiDetailCommonResponse(
+                    new TourApiDetailCommonResponse.Response(
+                            new TourApiDetailCommonResponse.Body(
+                                    new TourApiDetailCommonResponse.Items(List.of(
+                                            new TourApiDetailCommonResponse.Item(
+                                                    "127669", "12", "부석사",
+                                                    "경상북도 영주시 부석면 부석사로 345", "",
+                                                    "054-633-3464", "",
+                                                    "128.68", "36.99",
+                                                    "https://img.jpg", "신라 문무왕 때 창건한 사찰",
+                                                    "HS", "HS01", "HS010600",
+                                                    "47", "210"
+                                            )
+                                    ))
+                            )
+                    )
+            );
+
+            // when
+            ContentDetailResponse result = mapper.toDetailResponse(
+                    common,
+                    new TourApiDetailIntroResponse(null),
+                    new TourApiDetailImageResponse(null));
+
+            // then
+            assertThat(result.region()).isEqualTo("YEONGJU");
         }
     }
 }
