@@ -52,7 +52,7 @@ public class TourApiContentMapper {
         int contentTypeId = parseIntOrZero(commonItem.contenttypeid());
         ContentCategory category = ContentCategory.resolve(
                 commonItem.lclsSystm1(), commonItem.lclsSystm2(), commonItem.contenttypeid());
-        Region region = Region.fromAreaCode(commonItem.areacode(), commonItem.sigungucode());
+        Region region = Region.fromLdongCode(commonItem.lDongRegnCd(), commonItem.lDongSignguCd());
 
         return new ContentDetailResponse(
                 commonItem.contentid(),

@@ -49,8 +49,8 @@ class TourApiContentAdapterTest {
             ContentListResponse expected = new ContentListResponse(0, 0, 20, List.of());
 
             given(tourApiClient.getAreaBasedList(
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     isNull(),
                     eq(1),
                     eq(20)
@@ -80,8 +80,8 @@ class TourApiContentAdapterTest {
 
             given(tourApiClient.searchByKeyword(
                     eq("쌍계사"),
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     isNull(),
                     eq(1),
                     eq(20)
@@ -109,8 +109,8 @@ class TourApiContentAdapterTest {
             TourApiListResponse errorResponse = errorListResponse();
 
             given(tourApiClient.getAreaBasedList(
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     isNull(),
                     eq(1),
                     eq(20)
@@ -138,8 +138,8 @@ class TourApiContentAdapterTest {
             ContentListResponse expected = new ContentListResponse(0, 0, 20, List.of());
 
             given(tourApiClient.getAreaBasedList(
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     eq("14"),
                     eq(1),
                     eq(20)
@@ -163,8 +163,8 @@ class TourApiContentAdapterTest {
             ContentListResponse expected = new ContentListResponse(0, 0, 20, List.of());
 
             given(tourApiClient.getAreaBasedList(
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     eq("12"),
                     eq(1),
                     eq(20)
@@ -188,8 +188,8 @@ class TourApiContentAdapterTest {
             ContentListResponse expected = new ContentListResponse(0, 0, 20, List.of());
 
             given(tourApiClient.getAreaBasedList(
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     eq("14"),
                     eq(1),
                     eq(20)
@@ -213,8 +213,8 @@ class TourApiContentAdapterTest {
             ContentListResponse expected = new ContentListResponse(0, 0, 20, List.of());
 
             given(tourApiClient.getAreaBasedList(
-                    eq(region.getAreaCode()),
-                    eq(region.getSigunguCode()),
+                    eq(region.getLDongRegnCd()),
+                    eq(region.getLDongSignguCd()),
                     eq("28"),
                     eq(1),
                     eq(20)

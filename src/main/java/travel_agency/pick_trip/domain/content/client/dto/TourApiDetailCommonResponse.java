@@ -40,8 +40,8 @@ public record TourApiDetailCommonResponse(Response response) implements TourApiR
             String lclsSystm1,
             String lclsSystm2,
             String lclsSystm3,
-            String areacode,
-            String sigungucode
+            String lDongRegnCd,
+            String lDongSignguCd
     ) {}
 
     @Override
