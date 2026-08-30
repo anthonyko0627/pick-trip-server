@@ -5,20 +5,30 @@ import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailCommonResp
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailImageResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailIntroResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiListResponse;
+import travel_agency.pick_trip.domain.content.client.dto.TourApiLocationListResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentSummaryResponse;
+import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse.NearbyContentItem;
 import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.region.Region;
 import travel_agency.pick_trip.gloal.error.ErrorCode;
 import travel_agency.pick_trip.gloal.error.exception.ContentException;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 @Component
 public class TourApiContentMapper {
+
+    /**
+     * 주변 조회 폴백에서 노출할 콘텐츠 타입(관광지·문화시설·축제·여행코스·레포츠·쇼핑·음식).
+     * 로컬 적재 대상({@code ContentCollectService})과 동일하게 맞춰 앱이 다루지 못하는 타입(숙박 등)을 제외한다.
+     */
+    private static final List<String> NEARBY_CONTENT_TYPE_IDS =
+            List.of("12", "14", "15", "25", "28", "38", "39");
 
     public ContentListResponse toListResponse(TourApiListResponse raw, int page, int size, Region region) {
         List<ContentSummaryResponse> items = Optional.ofNullable(raw.response())
@@ -79,6 +89,62 @@ public class TourApiContentMapper {
                 category.isIndoor(),
                 region != null ? region.name() : null
         );
+    }
+
+    /**
+     * {@code locationBasedList2} 응답을 주변 콘텐츠 아이템으로 변환한다. 기준 콘텐츠 자신, MVP 외 타입,
+     * 좌표가 없는 항목을 제외하고 거리 오름차순으로 상위 {@code size}개만 남긴다.
+     * {@code summary}는 이 API 가 제공하지 않아 항상 {@code null}이다.
+     */
+    public List<NearbyContentItem> toNearbyItems(
+            TourApiLocationListResponse raw, String originContentId, int size) {
+        return Optional.ofNullable(raw.response())
+                .map(TourApiLocationListResponse.Response::body)
+                .map(TourApiLocationListResponse.Body::items)
+                .map(TourApiLocationListResponse.Items::item)
+                .orElse(Collections.emptyList())
+                .stream()
+                .filter(item -> !originContentId.equals(item.contentid()))
+                .filter(item -> NEARBY_CONTENT_TYPE_IDS.contains(item.contenttypeid()))
+                .filter(item -> parseDouble(item.mapy()) != 0.0 && parseDouble(item.mapx()) != 0.0)
+                .sorted(Comparator.comparingDouble(item -> parseDistanceKm(item.dist())))
+                .limit(size)
+                .map(this::toNearbyItem)
+                .toList();
+    }
+
+    private NearbyContentItem toNearbyItem(TourApiLocationListResponse.Item item) {
+        ContentCategory category = ContentCategory.resolve(
+                item.lclsSystm1(), item.lclsSystm2(), item.contenttypeid());
+        Region region = Region.fromLdongCode(item.lDongRegnCd(), item.lDongSignguCd());
+        return new NearbyContentItem(
+                item.contentid(),
+                item.title(),
+                item.contenttypeid(),
+                buildAddress(item.addr1(), item.addr2()),
+                item.firstimage(),
+                parseDouble(item.mapy()),
+                parseDouble(item.mapx()),
+                category,
+                null,
+                region != null ? region.name() : null,
+                roundToTwo(parseDistanceKm(item.dist()))
+        );
+    }
+
+    private static double parseDistanceKm(String distMeters) {
+        if (distMeters == null || distMeters.isBlank()) {
+            return 0.0;
+        }
+        try {
+            return Double.parseDouble(distMeters) / 1000.0;
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
+    }
+
+    private static double roundToTwo(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 
     private ContentSummaryResponse toSummaryResponse(TourApiListResponse.Item item, Region region) {

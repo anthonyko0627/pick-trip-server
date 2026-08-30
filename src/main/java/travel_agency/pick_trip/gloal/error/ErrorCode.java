@@ -23,6 +23,7 @@ public enum ErrorCode {
     // Content
     CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "콘텐츠를 찾을 수 없습니다."),
     CONTENT_INVALID_REGION(HttpStatus.BAD_REQUEST, "지원하지 않는 지역입니다."),
+    CONTENT_LOCATION_UNKNOWN(HttpStatus.NOT_FOUND, "위치 정보가 없어 주변 콘텐츠를 조회할 수 없습니다."),
     CONTENT_PROVIDER_FAILED(HttpStatus.BAD_GATEWAY, "콘텐츠를 불러오지 못했습니다. 다시 시도해주세요."),
 
     // Itinerary

@@ -11,9 +11,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import travel_agency.pick_trip.domain.content.client.TourApiClient;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailCommonResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiListResponse;
+import travel_agency.pick_trip.domain.content.client.dto.TourApiLocationListResponse;
 import travel_agency.pick_trip.domain.content.dto.request.CompanionType;
 import travel_agency.pick_trip.domain.content.dto.request.ContentListRequest;
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
+import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse.NearbyContentItem;
+import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.region.Region;
 import travel_agency.pick_trip.gloal.error.ErrorCode;
 import travel_agency.pick_trip.gloal.error.exception.ContentException;
@@ -23,9 +26,11 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TourApiContentAdapter")
@@ -259,6 +264,92 @@ class TourApiContentAdapterTest {
                     .extracting("errorCode")
                     .isEqualTo(ErrorCode.CONTENT_PROVIDER_FAILED);
         }
+    }
+
+    @Nested
+    @DisplayName("fetchNearby")
+    class FetchNearby {
+
+        @Test
+        @DisplayName("좌표·반경으로 locationBasedList2를 거리순으로 호출하고 매핑 결과를 반환한다")
+        void callsLocationBasedListAndMaps() {
+            // given
+            TourApiLocationListResponse raw = emptyLocationResponse();
+            List<NearbyContentItem> mapped = List.of(nearbyItem("222", 1.2));
+            given(tourApiClient.getLocationBasedList("127.5678", "35.1234", 5000, "E", 1, 20))
+                    .willReturn(raw);
+            given(mapper.toNearbyItems(raw, "111", 10)).willReturn(mapped);
+
+            // when
+            List<NearbyContentItem> result = adapter.fetchNearby("111", 35.1234, 127.5678, 5.0, 10);
+
+            // then
+            assertThat(result).isEqualTo(mapped);
+        }
+
+        @Test
+        @DisplayName("반경이 20km를 넘으면 20000m로 제한해 호출한다")
+        void radiusCappedAt20km() {
+            // given
+            TourApiLocationListResponse raw = emptyLocationResponse();
+            given(tourApiClient.getLocationBasedList(eq("127.0"), eq("35.0"), eq(20000), eq("E"), eq(1), anyInt()))
+                    .willReturn(raw);
+            given(mapper.toNearbyItems(eq(raw), eq("111"), anyInt())).willReturn(List.of());
+
+            // when
+            adapter.fetchNearby("111", 35.0, 127.0, 999.0, 10);
+
+            // then
+            verify(tourApiClient).getLocationBasedList("127.0", "35.0", 20000, "E", 1, 20);
+        }
+
+        @Test
+        @DisplayName("resultCode가 오류이면 CONTENT_PROVIDER_FAILED를 던진다")
+        void errorResultCode_throwsProviderFailed() {
+            // given
+            given(tourApiClient.getLocationBasedList(any(), any(), anyInt(), any(), anyInt(), anyInt()))
+                    .willReturn(errorLocationResponse());
+
+            // when & then
+            assertThatThrownBy(() -> adapter.fetchNearby("111", 35.0, 127.0, 5.0, 10))
+                    .isInstanceOf(ContentException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.CONTENT_PROVIDER_FAILED);
+        }
+
+        @Test
+        @DisplayName("TourAPI 호출이 실패하면 CONTENT_PROVIDER_FAILED를 던진다")
+        void feignException_throwsProviderFailed() {
+            // given
+            given(tourApiClient.getLocationBasedList(any(), any(), anyInt(), any(), anyInt(), anyInt()))
+                    .willThrow(FeignException.class);
+
+            // when & then
+            assertThatThrownBy(() -> adapter.fetchNearby("111", 35.0, 127.0, 5.0, 10))
+                    .isInstanceOf(ContentException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.CONTENT_PROVIDER_FAILED);
+        }
+
+        private NearbyContentItem nearbyItem(String id, double distanceKm) {
+            return new NearbyContentItem(
+                    id, "t" + id, "12", "addr", null, 35.1, 127.5,
+                    ContentCategory.ATTRACTION, null, "HADONG", distanceKm);
+        }
+    }
+
+    private TourApiLocationListResponse emptyLocationResponse() {
+        return new TourApiLocationListResponse(
+                new TourApiLocationListResponse.Response(
+                        new TourApiLocationListResponse.Body(
+                                new TourApiLocationListResponse.Items(List.of()), 20, 1, 0)));
+    }
+
+    private TourApiLocationListResponse errorLocationResponse() {
+        return new TourApiLocationListResponse(
+                new TourApiLocationListResponse.Response(
+                        new TourApiLocationListResponse.Header("30", "LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR"),
+                        null));
     }
 
     private TourApiListResponse emptyListResponse() {

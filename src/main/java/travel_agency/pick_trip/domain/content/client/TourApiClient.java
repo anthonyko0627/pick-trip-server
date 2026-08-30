@@ -9,6 +9,7 @@ import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailImageRespo
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailIntroResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiFestivalResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiListResponse;
+import travel_agency.pick_trip.domain.content.client.dto.TourApiLocationListResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiSyncResponse;
 
 @FeignClient(
@@ -33,6 +34,20 @@ public interface TourApiClient {
             @RequestParam String lDongRegnCd,
             @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
+            @RequestParam int pageNo,
+            @RequestParam int numOfRows
+    );
+
+    /**
+     * 좌표·반경 기반 목록. {@code mapX}(경도)/{@code mapY}(위도) 중심 {@code radius}(m, 최대 20000) 안의
+     * 콘텐츠를 {@code arrange}(E=거리순) 순으로 반환한다.
+     */
+    @GetMapping("/locationBasedList2")
+    TourApiLocationListResponse getLocationBasedList(
+            @RequestParam String mapX,
+            @RequestParam String mapY,
+            @RequestParam int radius,
+            @RequestParam String arrange,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
     );

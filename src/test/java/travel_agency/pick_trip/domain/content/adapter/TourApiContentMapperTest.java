@@ -8,8 +8,10 @@ import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailCommonResp
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailImageResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailIntroResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiListResponse;
+import travel_agency.pick_trip.domain.content.client.dto.TourApiLocationListResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
+import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse.NearbyContentItem;
 import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.region.Region;
 
@@ -203,6 +205,81 @@ class TourApiContentMapperTest {
 
             // then
             assertThat(result.region()).isEqualTo("YEONGJU");
+        }
+    }
+
+    @Nested
+    @DisplayName("toNearbyItems")
+    class ToNearbyItems {
+
+        @Test
+        @DisplayName("기준 콘텐츠와 비MVP 타입 항목을 제외하고 거리(m)를 km로 변환해 거리순으로 반환한다")
+        void filtersOriginAndNonMvpTypesAndConvertsDistance() {
+            // given
+            TourApiLocationListResponse raw = locationResponse(
+                    locationItem("111", "12", "127.50", "35.10", "0", "48", "850"),      // 기준 콘텐츠 → 제외
+                    locationItem("999", "32", "127.51", "35.11", "500", "48", "850"),    // 숙박(비MVP) → 제외
+                    locationItem("222", "39", "127.52", "35.12", "1500.5", "48", "850"), // 음식점
+                    locationItem("333", "12", "127.53", "35.13", "800.0", "48", "850")   // 관광지
+            );
+
+            // when
+            List<NearbyContentItem> result = mapper.toNearbyItems(raw, "111", 10);
+
+            // then
+            assertThat(result).extracting("contentId").containsExactly("333", "222");
+            assertThat(result.get(0).distanceKm()).isEqualTo(0.8);
+            assertThat(result.get(1).distanceKm()).isEqualTo(1.5);
+            assertThat(result.get(0).region()).isEqualTo("HADONG");
+        }
+
+        @Test
+        @DisplayName("size를 넘는 항목은 거리순으로 잘라낸다")
+        void limitsToSize() {
+            // given
+            TourApiLocationListResponse raw = locationResponse(
+                    locationItem("a", "12", "127.5", "35.1", "300", "48", "850"),
+                    locationItem("b", "12", "127.5", "35.1", "100", "48", "850"),
+                    locationItem("c", "12", "127.5", "35.1", "200", "48", "850")
+            );
+
+            // when
+            List<NearbyContentItem> result = mapper.toNearbyItems(raw, "origin", 2);
+
+            // then
+            assertThat(result).extracting("contentId").containsExactly("b", "c");
+        }
+
+        @Test
+        @DisplayName("대상 지역(하동·영주·예천) 밖 항목은 region이 null이다")
+        void outsideMvpRegion_regionIsNull() {
+            // given
+            TourApiLocationListResponse raw = locationResponse(
+                    locationItem("x", "12", "127.5", "35.1", "100", "1", "1")
+            );
+
+            // when
+            List<NearbyContentItem> result = mapper.toNearbyItems(raw, "origin", 10);
+
+            // then
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).region()).isNull();
+        }
+
+        private TourApiLocationListResponse locationResponse(TourApiLocationListResponse.Item... items) {
+            return new TourApiLocationListResponse(
+                    new TourApiLocationListResponse.Response(
+                            new TourApiLocationListResponse.Body(
+                                    new TourApiLocationListResponse.Items(List.of(items)),
+                                    20, 1, items.length)));
+        }
+
+        private TourApiLocationListResponse.Item locationItem(
+                String id, String typeId, String mapx, String mapy,
+                String dist, String lDongRegnCd, String lDongSignguCd) {
+            return new TourApiLocationListResponse.Item(
+                    id, typeId, "title-" + id, "addr1", "", mapx, mapy, null,
+                    dist, lDongRegnCd, lDongSignguCd, null, null);
         }
     }
 }
