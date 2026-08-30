@@ -73,7 +73,7 @@ class ContentSyncServiceTest {
     @DisplayName("showflag=0 이면 적재 콘텐츠를 INACTIVE 로 변경한다")
     void syncRegion_showflag0_INACTIVE() {
         TravelContent content = activeContent();
-        given(tourApiClient.getAreaBasedSyncList("36", "18", null, null, 1, 100))
+        given(tourApiClient.getAreaBasedSyncList("48", "850", null, null, 1, 100))
                 .willReturn(syncResponse("0"));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.of(content));
 
@@ -88,7 +88,7 @@ class ContentSyncServiceTest {
     @DisplayName("상태 변화가 없으면 저장하지 않는다")
     void syncRegion_상태동일_미변경() {
         TravelContent content = activeContent();
-        given(tourApiClient.getAreaBasedSyncList("36", "18", null, null, 1, 100))
+        given(tourApiClient.getAreaBasedSyncList("48", "850", null, null, 1, 100))
                 .willReturn(syncResponse("1"));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.of(content));
 
@@ -102,7 +102,7 @@ class ContentSyncServiceTest {
     @Test
     @DisplayName("아직 적재되지 않은 콘텐츠는 건너뛴다")
     void syncRegion_미적재_건너뜀() {
-        given(tourApiClient.getAreaBasedSyncList("36", "18", null, null, 1, 100))
+        given(tourApiClient.getAreaBasedSyncList("48", "850", null, null, 1, 100))
                 .willReturn(syncResponse("0"));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.empty());
 
@@ -115,7 +115,7 @@ class ContentSyncServiceTest {
     @Test
     @DisplayName("동기화 조회가 실패하면 예외를 전파하지 않는다")
     void syncRegion_조회실패_미반영() {
-        given(tourApiClient.getAreaBasedSyncList(eq("36"), eq("18"), isNull(), isNull(), eq(1), eq(100)))
+        given(tourApiClient.getAreaBasedSyncList(eq("48"), eq("850"), isNull(), isNull(), eq(1), eq(100)))
                 .willThrow(feignError());
 
         int updated = contentSyncService.syncRegion(REGION);
@@ -127,7 +127,7 @@ class ContentSyncServiceTest {
     @Test
     @DisplayName("오류 결과코드(HTTP 200) 응답이면 반영하지 않는다")
     void syncRegion_오류코드_미반영() {
-        given(tourApiClient.getAreaBasedSyncList("36", "18", null, null, 1, 100))
+        given(tourApiClient.getAreaBasedSyncList("48", "850", null, null, 1, 100))
                 .willReturn(errorResponse());
 
         int updated = contentSyncService.syncRegion(REGION);

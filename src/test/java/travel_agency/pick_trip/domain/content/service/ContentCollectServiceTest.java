@@ -120,7 +120,7 @@ class ContentCollectServiceTest {
     @Test
     @DisplayName("신규 콘텐츠를 상세 보강과 함께 저장한다")
     void collectRegion_신규콘텐츠_저장() {
-        given(tourApiClient.getAreaBasedList("36", "18", "12", 1, 100))
+        given(tourApiClient.getAreaBasedList("48", "850", "12", 1, 100))
                 .willReturn(listResponse(listItem()));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.empty());
         stubDetailCalls();
@@ -146,7 +146,7 @@ class ContentCollectServiceTest {
     @Test
     @DisplayName("신분류체계 대분류 코드를 6종 category로 변환한다")
     void collectRegion_신분류체계_대분류_매핑() {
-        given(tourApiClient.getAreaBasedList("36", "18", "12", 1, 100))
+        given(tourApiClient.getAreaBasedList("48", "850", "12", 1, 100))
                 .willReturn(listResponse(listItem()));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.empty());
         given(tourApiClient.getDetailCommon(CONTENT_ID)).willReturn(commonResponse("NA", "NA05"));
@@ -163,7 +163,7 @@ class ContentCollectServiceTest {
     @Test
     @DisplayName("VE(문화관광) 중분류는 대분류 기본값 대신 개별 예외 매핑을 사용한다")
     void collectRegion_신분류체계_VE_예외매핑() {
-        given(tourApiClient.getAreaBasedList("36", "18", "12", 1, 100))
+        given(tourApiClient.getAreaBasedList("48", "850", "12", 1, 100))
                 .willReturn(listResponse(listItem()));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.empty());
         given(tourApiClient.getDetailCommon(CONTENT_ID)).willReturn(commonResponse("VE", "VE03"));
@@ -181,7 +181,7 @@ class ContentCollectServiceTest {
     @Test
     @DisplayName("신분류체계 코드가 없으면 ATTRACTION으로 대체한다")
     void collectRegion_신분류체계_코드없음_기본값() {
-        given(tourApiClient.getAreaBasedList("36", "18", "12", 1, 100))
+        given(tourApiClient.getAreaBasedList("48", "850", "12", 1, 100))
                 .willReturn(listResponse(listItem()));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.empty());
         stubDetailCalls();
@@ -202,7 +202,7 @@ class ContentCollectServiceTest {
                 .title("옛 제목")
                 .region(Region.HADONG)
                 .build();
-        given(tourApiClient.getAreaBasedList("36", "18", "12", 1, 100))
+        given(tourApiClient.getAreaBasedList("48", "850", "12", 1, 100))
                 .willReturn(listResponse(listItem()));
         given(travelContentRepository.findById(CONTENT_ID)).willReturn(Optional.of(existing));
         stubDetailCalls();
@@ -218,7 +218,7 @@ class ContentCollectServiceTest {
     @Test
     @DisplayName("상세 보강이 실패하면 해당 콘텐츠를 건너뛰고 저장하지 않는다")
     void collectRegion_상세실패_건너뜀() {
-        given(tourApiClient.getAreaBasedList("36", "18", "12", 1, 100))
+        given(tourApiClient.getAreaBasedList("48", "850", "12", 1, 100))
                 .willReturn(listResponse(listItem()));
         // 상세 호출이 DB 조회보다 먼저이므로, 상세 실패 시 findById 는 호출되지 않는다.
         given(tourApiClient.getDetailCommon(CONTENT_ID)).willThrow(feignError());
@@ -232,7 +232,7 @@ class ContentCollectServiceTest {
     @Test
     @DisplayName("목록 응답이 오류 결과코드(HTTP 200)면 해당 타입을 건너뛴다")
     void collectRegion_오류코드_건너뜀() {
-        given(tourApiClient.getAreaBasedList(eq("36"), eq("18"), anyString(), eq(1), eq(100)))
+        given(tourApiClient.getAreaBasedList(eq("48"), eq("850"), anyString(), eq(1), eq(100)))
                 .willReturn(errorListResponse());
 
         int collected = contentCollectService.collectRegion(REGION);

@@ -62,7 +62,7 @@ public class TourApiContentMapper {
         int contentTypeId = parseIntOrZero(commonItem.contenttypeid());
         ContentCategory category = ContentCategory.resolve(
                 commonItem.lclsSystm1(), commonItem.lclsSystm2(), commonItem.contenttypeid());
-        Region region = Region.fromAreaCode(commonItem.areacode(), commonItem.sigungucode());
+        Region region = Region.fromLdongCode(commonItem.lDongRegnCd(), commonItem.lDongSignguCd());
 
         return new ContentDetailResponse(
                 commonItem.contentid(),
@@ -116,7 +116,7 @@ public class TourApiContentMapper {
     private NearbyContentItem toNearbyItem(TourApiLocationListResponse.Item item) {
         ContentCategory category = ContentCategory.resolve(
                 item.lclsSystm1(), item.lclsSystm2(), item.contenttypeid());
-        Region region = Region.fromAreaCode(item.areacode(), item.sigungucode());
+        Region region = Region.fromLdongCode(item.lDongRegnCd(), item.lDongSignguCd());
         return new NearbyContentItem(
                 item.contentid(),
                 item.title(),

@@ -40,8 +40,8 @@ public record TourApiLocationListResponse(Response response) implements TourApiR
             String firstimage,
             /** 기준 좌표로부터의 거리(m). */
             String dist,
-            String areacode,
-            String sigungucode,
+            String lDongRegnCd,
+            String lDongSignguCd,
             String lclsSystm1,
             String lclsSystm2
     ) {}

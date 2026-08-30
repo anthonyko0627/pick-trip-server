@@ -38,7 +38,7 @@ public class ContentSyncService {
         TourApiSyncResponse response;
         try {
             response = tourApiClient.getAreaBasedSyncList(
-                    region.getAreaCode(), region.getSigunguCode(), null, null, 1, PAGE_SIZE);
+                    region.getLDongRegnCd(), region.getLDongSignguCd(), null, null, 1, PAGE_SIZE);
         } catch (FeignException e) {
             log.warn("[동기화] {} 조회 실패 - 건너뜀: {}", region, e.getMessage());
             return 0;

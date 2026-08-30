@@ -27,8 +27,8 @@ TourAPI 수집은 **지역 코드 → 분류 코드 → 콘텐츠 → 축제 →
 
 | 오퍼레이션 | 사용 목적 | 우선순위 |
 |-----------|----------|---------|
-| `/areaCode2` | 하동/영주/예천 지역 코드 확인 | 필수 |
-| `/ldongCode2` | 법정동 코드 기반 지역 매핑 | 필수 |
+| `/areaCode2` | legacy 시도/시군구 코드 seed (지역 필터에는 사용하지 않음) | 보조 |
+| `/ldongCode2` | 하동/영주/예천 법정동 코드 확인 (**지역 필터 기준**) | 필수 |
 | `/categoryCode2` | 관광 타입 카테고리 코드 확인 | 필수 |
 | `/lclsSystmCode2` | 신분류체계 1/2/3Depth 코드 수집 | 필수 |
 | `/areaBasedList2` | 하동/영주/예천 콘텐츠 후보 수집 | 필수 |
@@ -41,6 +41,24 @@ TourAPI 수집은 **지역 코드 → 분류 코드 → 콘텐츠 → 축제 →
 | `/areaBasedSyncList2` | 콘텐츠 변경/삭제/수정 동기화 | 필수 |
 | `/gallerySearchList1` | 지역명/키워드 기반 보조 이미지 검색 | 보조 |
 | `/gallerySyncDetailList1` | 관광사진 변경분 동기화 | 보조 |
+
+## 지역 필터 규칙 (#68)
+
+지역 필터가 필요한 오퍼레이션은 **법정동 코드**(`lDongRegnCd`/`lDongSignguCd`)로만 호출한다.
+legacy `areaCode`/`sigunguCode`는 사용하지 않는다.
+
+| 지역 | `lDongRegnCd` | `lDongSignguCd` |
+|---|---|---|
+| 하동 (HADONG) | `48` | `850` |
+| 영주 (YEONGJU) | `47` | `210` |
+| 예천 (YECHEON) | `47` | `900` |
+
+대상 오퍼레이션: `/areaBasedList2`, `/searchKeyword2`, `/searchFestival2`, `/areaBasedSyncList2`
+
+이유 — KorService2는 신규·갱신 콘텐츠에 법정동 코드만 채운다. legacy 코드로 필터하면 콘텐츠가 30~50% 누락되고(부석사·소수서원 등),
+`/searchFestival2`는 legacy 필터에서 **0건**을 반환한다. 법정동 결과는 legacy 결과의 완전한 상위집합이므로 두 코드를 병합 조회할 필요가 없다.
+
+`/detailCommon2` 역매핑도 `lDongRegnCd`/`lDongSignguCd`를 쓴다 (`areacode`가 빈 문자열로 내려오는 콘텐츠가 다수).
 
 ## MVP 콘텐츠 타입 매핑
 
@@ -59,8 +77,8 @@ TourAPI 수집은 **지역 코드 → 분류 코드 → 콘텐츠 → 축제 →
 
 ```
 1단계: 지역 코드 수집
-  /areaCode2 → 경남/경북 코드 확인
-  /ldongCode2 → 법정동 코드 저장
+  /ldongCode2 → 법정동 코드 저장 (지역 필터 기준)
+  /areaCode2  → legacy 코드 seed (보조)
   → regions 테이블에 HADONG/YEONGJU/YECHEON 매핑
 
 2단계: 분류 코드 수집
