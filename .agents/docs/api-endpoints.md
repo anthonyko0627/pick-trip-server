@@ -47,7 +47,14 @@
 | GET   | `/api/v1/contents/{id}`       | X        | 콘텐츠 상세 조회                           |
 | GET   | `/api/v1/contents/{id}/nearby` | X       | 해당 콘텐츠 좌표 기준 반경 내 주변 콘텐츠 조회 (거리순) |
 
-`GET /api/v1/contents/{id}/nearby` 는 로컬 적재분(`travel_contents`)만 대상으로 하며, 쿼리 파라미터 `radiusKm`(기본 5, 최대 20)과 `size`(기본 10, 최대 30)를 받는다. 응답 각 항목에 Haversine 근사 거리 `distanceKm`(km)를 포함한다. 기준 콘텐츠가 로컬에 없으면 `CONTENT_NOT_FOUND`, 좌표가 없으면 `CONTENT_LOCATION_UNKNOWN` 을 반환한다.
+`GET /api/v1/contents/{id}/nearby` 는 쿼리 파라미터 `radiusKm`(기본 5, 최대 20)과 `size`(기본 10, 최대 30)를 받고, 응답 각 항목에 거리 `distanceKm`(km)를 포함한다.
+
+조회 소스는 응답의 `source` 필드로 구분한다.
+
+- `LOCAL` — 로컬 적재분(`travel_contents`)에서 Haversine 근사로 조회. 기준 콘텐츠가 로컬에 있고 좌표가 유효하며 반경 내 로컬 행이 1건 이상일 때.
+- `TOURAPI` — 로컬로 답할 수 없어(기준 콘텐츠 미적재 · 좌표 없음/(0,0) · 반경 내 로컬 행 0건) TourAPI `locationBasedList2`로 조회. 좌표는 로컬 또는 TourAPI 상세에서 확보하며, 기준 콘텐츠 자신·MVP 외 콘텐츠 타입은 제외한다. 이 소스에서는 `summary`가 항상 `null`이고, 대상 지역(하동·영주·예천) 밖 항목은 `region`이 `null`이다.
+
+두 소스를 섞지 않는다. TourAPI가 기준 콘텐츠를 모르면 `CONTENT_NOT_FOUND`, 로컬·TourAPI 어디에서도 좌표를 얻지 못하면 `CONTENT_LOCATION_UNKNOWN`, TourAPI 호출이 실패하면 `CONTENT_PROVIDER_FAILED` 를 반환한다.
 
 ## 여행 바구니
 

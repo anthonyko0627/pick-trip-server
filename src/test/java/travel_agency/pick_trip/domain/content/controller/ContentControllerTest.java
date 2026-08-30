@@ -126,7 +126,8 @@ class ContentControllerTest {
         @DisplayName("정상 요청이면 200과 NearbyContentResponse를 반환한다")
         void validRequest_returns200WithNearby() {
             // given
-            NearbyContentResponse expected = new NearbyContentResponse("111", 5.0, List.of(
+            NearbyContentResponse expected = new NearbyContentResponse("111", 5.0,
+                    NearbyContentResponse.NearbySource.LOCAL, List.of(
                     new NearbyContentResponse.NearbyContentItem("222", "최참판댁", "12", "하동군 악양면",
                             "https://img.jpg", 35.13, 127.57, ContentCategory.CULTURE, "토지 배경", "HADONG", 1.23)
             ));
@@ -146,7 +147,8 @@ class ContentControllerTest {
         @DisplayName("radiusKm·size 파라미터가 없으면 기본값 5km·10개로 위임한다")
         void missingParams_delegatesWithDefaults() throws Exception {
             given(contentService.getNearbyContents(eq("111"), eq(5.0), eq(10)))
-                    .willReturn(new NearbyContentResponse("111", 5.0, List.of()));
+                    .willReturn(new NearbyContentResponse("111", 5.0,
+                            NearbyContentResponse.NearbySource.TOURAPI, List.of()));
 
             mockMvc.perform(get("/api/v1/contents/111/nearby"))
                     .andExpect(status().isOk());

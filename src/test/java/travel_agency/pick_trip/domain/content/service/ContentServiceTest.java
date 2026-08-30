@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.List;
@@ -121,48 +122,22 @@ class ContentServiceTest {
                     .build();
         }
 
-        @Test
-        @DisplayName("기준 콘텐츠가 없으면 CONTENT_NOT_FOUND 예외를 던진다")
-        void originNotFound_throwsContentNotFound() {
-            // given
-            given(travelContentRepository.findById(ORIGIN_ID)).willReturn(Optional.empty());
+        private ContentDetailResponse detailAt(double latitude, double longitude) {
+            return new ContentDetailResponse(
+                    ORIGIN_ID, "화개장터", 12, "경상남도 하동군", null, null,
+                    latitude, longitude, null, null, null, null, null, null, null,
+                    null, null, "TourAPI", List.of(), ContentCategory.ATTRACTION, false, "HADONG");
+        }
 
-            // when & then
-            assertThatThrownBy(() -> contentService.getNearbyContents(ORIGIN_ID, 5.0, 10))
-                    .isInstanceOf(ContentException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
+        private NearbyContentResponse.NearbyContentItem remoteItem(String id, double distanceKm) {
+            return new NearbyContentResponse.NearbyContentItem(
+                    id, "주변 " + id, "12", "하동군", null, 35.1, 127.5,
+                    ContentCategory.ATTRACTION, null, "HADONG", distanceKm);
         }
 
         @Test
-        @DisplayName("기준 콘텐츠에 좌표가 없으면 CONTENT_LOCATION_UNKNOWN 예외를 던진다")
-        void originWithoutCoordinates_throwsContentLocationUnknown() {
-            // given
-            given(travelContentRepository.findById(ORIGIN_ID)).willReturn(Optional.of(origin(null, null)));
-
-            // when & then
-            assertThatThrownBy(() -> contentService.getNearbyContents(ORIGIN_ID, 5.0, 10))
-                    .isInstanceOf(ContentException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(ErrorCode.CONTENT_LOCATION_UNKNOWN);
-        }
-
-        @Test
-        @DisplayName("기준 콘텐츠 좌표가 (0, 0)이면 CONTENT_LOCATION_UNKNOWN 예외를 던진다")
-        void originAtNullIsland_throwsContentLocationUnknown() {
-            // given
-            given(travelContentRepository.findById(ORIGIN_ID)).willReturn(Optional.of(origin(0.0, 0.0)));
-
-            // when & then
-            assertThatThrownBy(() -> contentService.getNearbyContents(ORIGIN_ID, 5.0, 10))
-                    .isInstanceOf(ContentException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(ErrorCode.CONTENT_LOCATION_UNKNOWN);
-        }
-
-        @Test
-        @DisplayName("기준 좌표로 조회한 행을 거리 오름차순 아이템으로 매핑하고 거리를 소수 2자리로 반올림한다")
-        void validOrigin_mapsRowsWithRoundedDistance() {
+        @DisplayName("로컬 기준 콘텐츠 좌표로 조회한 주변 행이 있으면 LOCAL 소스로 거리순 매핑해 반환한다")
+        void localOriginWithNeighbors_returnsLocalSource() {
             // given
             given(travelContentRepository.findById(ORIGIN_ID))
                     .willReturn(Optional.of(origin(35.1234, 127.5678)));
@@ -178,6 +153,7 @@ class ContentServiceTest {
             NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
 
             // then
+            assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.LOCAL);
             assertThat(result.originContentId()).isEqualTo(ORIGIN_ID);
             assertThat(result.items()).hasSize(2);
             assertThat(result.items().get(0).contentId()).isEqualTo("222");
@@ -194,7 +170,8 @@ class ContentServiceTest {
             given(travelContentRepository.findById(ORIGIN_ID))
                     .willReturn(Optional.of(origin(35.1234, 127.5678)));
             given(travelContentRepository.findNearby(any(), anyDouble(), anyDouble(), anyDouble(), anyInt()))
-                    .willReturn(List.of());
+                    .willReturn(List.of(
+                            row("222", "x", "12", "a", null, 35.1, 127.5, null, null, "HADONG", 1.0)));
 
             // when
             NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 999.0, 999);
@@ -211,13 +188,132 @@ class ContentServiceTest {
             given(travelContentRepository.findById(ORIGIN_ID))
                     .willReturn(Optional.of(origin(35.1234, 127.5678)));
             given(travelContentRepository.findNearby(any(), anyDouble(), anyDouble(), anyDouble(), anyInt()))
-                    .willReturn(List.of());
+                    .willReturn(List.of(
+                            row("222", "x", "12", "a", null, 35.1, 127.5, null, null, "HADONG", 1.0)));
 
             // when
             contentService.getNearbyContents(ORIGIN_ID, 0.0, 0);
 
             // then
             verify(travelContentRepository).findNearby(ORIGIN_ID, 35.1234, 127.5678, 5.0, 10);
+        }
+
+        @Test
+        @DisplayName("로컬 기준 콘텐츠는 있으나 주변 로컬 행이 없으면 TourAPI 폴백 결과를 TOURAPI 소스로 반환한다")
+        void localOriginButNoLocalNeighbors_fallsBackToTourApi() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID))
+                    .willReturn(Optional.of(origin(35.1234, 127.5678)));
+            given(travelContentRepository.findNearby(eq(ORIGIN_ID), anyDouble(), anyDouble(), anyDouble(), anyInt()))
+                    .willReturn(List.of());
+            given(adapter.fetchNearby(ORIGIN_ID, 35.1234, 127.5678, 5.0, 10))
+                    .willReturn(List.of(remoteItem("999", 2.5)));
+
+            // when
+            NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
+
+            // then
+            assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.TOURAPI);
+            assertThat(result.items()).extracting("contentId").containsExactly("999");
+        }
+
+        @Test
+        @DisplayName("기준 콘텐츠가 로컬에 없으면 TourAPI 상세로 좌표를 확보해 폴백한다")
+        void originNotInLocalDb_resolvesCoordinatesFromDetailAndFallsBack() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID)).willReturn(Optional.empty());
+            given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(35.15, 127.55));
+            given(adapter.fetchNearby(ORIGIN_ID, 35.15, 127.55, 5.0, 10))
+                    .willReturn(List.of(remoteItem("999", 1.0)));
+
+            // when
+            NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
+
+            // then
+            assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.TOURAPI);
+            assertThat(result.items()).hasSize(1);
+            verify(travelContentRepository, never())
+                    .findNearby(any(), anyDouble(), anyDouble(), anyDouble(), anyInt());
+        }
+
+        @Test
+        @DisplayName("로컬에 없고 TourAPI 상세도 해당 콘텐츠를 모르면 CONTENT_NOT_FOUND를 전파한다")
+        void originNotInLocalDb_andDetailNotFound_propagatesContentNotFound() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID)).willReturn(Optional.empty());
+            given(adapter.fetchDetail(ORIGIN_ID))
+                    .willThrow(new ContentException(ErrorCode.CONTENT_NOT_FOUND));
+
+            // when & then
+            assertThatThrownBy(() -> contentService.getNearbyContents(ORIGIN_ID, 5.0, 10))
+                    .isInstanceOf(ContentException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.CONTENT_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("로컬 좌표가 없으면 TourAPI 상세 좌표로 폴백한다")
+        void localOriginWithoutCoordinates_resolvesFromDetailAndFallsBack() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID))
+                    .willReturn(Optional.of(origin(null, null)));
+            given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(35.15, 127.55));
+            given(adapter.fetchNearby(ORIGIN_ID, 35.15, 127.55, 5.0, 10))
+                    .willReturn(List.of(remoteItem("999", 1.0)));
+
+            // when
+            NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
+
+            // then
+            assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.TOURAPI);
+        }
+
+        @Test
+        @DisplayName("로컬·TourAPI 상세 모두 좌표가 없으면 CONTENT_LOCATION_UNKNOWN을 던진다")
+        void neitherLocalNorDetailHasCoordinates_throwsLocationUnknown() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID))
+                    .willReturn(Optional.of(origin(null, null)));
+            given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(0.0, 0.0));
+
+            // when & then
+            assertThatThrownBy(() -> contentService.getNearbyContents(ORIGIN_ID, 5.0, 10))
+                    .isInstanceOf(ContentException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(ErrorCode.CONTENT_LOCATION_UNKNOWN);
+        }
+
+        @Test
+        @DisplayName("기준 콘텐츠 좌표가 (0, 0)이면 TourAPI 상세 좌표로 폴백을 시도한다")
+        void originAtNullIsland_resolvesFromDetail() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID))
+                    .willReturn(Optional.of(origin(0.0, 0.0)));
+            given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(35.15, 127.55));
+            given(adapter.fetchNearby(ORIGIN_ID, 35.15, 127.55, 5.0, 10)).willReturn(List.of());
+
+            // when
+            NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
+
+            // then
+            assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.TOURAPI);
+            assertThat(result.items()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("TourAPI 폴백 결과가 비어도 200 응답으로 빈 목록을 TOURAPI 소스로 반환한다")
+        void tourApiFallbackEmpty_returnsEmptyItems() {
+            // given
+            given(travelContentRepository.findById(ORIGIN_ID)).willReturn(Optional.empty());
+            given(adapter.fetchDetail(ORIGIN_ID)).willReturn(detailAt(35.15, 127.55));
+            given(adapter.fetchNearby(ORIGIN_ID, 35.15, 127.55, 5.0, 10)).willReturn(List.of());
+
+            // when
+            NearbyContentResponse result = contentService.getNearbyContents(ORIGIN_ID, 5.0, 10);
+
+            // then
+            assertThat(result.items()).isEmpty();
+            assertThat(result.source()).isEqualTo(NearbyContentResponse.NearbySource.TOURAPI);
         }
 
         private NearbyContentProjection row(
