@@ -27,10 +27,10 @@ User 1──< Itinerary 1──< ItineraryDay 1──< ItineraryItem >── Tra
 | ---------------- | ------------------ | ---------------------- |
 | `id`             | 자체               | 내부 지역 ID           |
 | `name`           | 자체               | 하동, 영주, 예천        |
-| `areaCode`       | `/areaCode2`       | TourAPI 시도 코드       |
-| `sigunguCode`    | `/areaCode2`       | TourAPI 시군구 코드     |
-| `ldongRegnCd`    | `/ldongCode2`      | 법정동 시도 코드        |
-| `ldongSignguCd`  | `/ldongCode2`      | 법정동 시군구 코드      |
+| `lDongRegnCd`    | `/ldongCode2`      | 법정동 시도 코드 (지역 필터 기준) |
+| `lDongSignguCd`  | `/ldongCode2`      | 법정동 시군구 코드 (지역 필터 기준) |
+
+> legacy `areaCode`/`sigunguCode`는 KorService2에서 신규·갱신 콘텐츠에 채워지지 않아 사용하지 않는다. (#68)
 
 ---
 
@@ -43,7 +43,7 @@ TourAPI 기반 콘텐츠 원천 데이터. `content_details`와 1:1 관계.
 | `sourceContentId`  | `contentid`                           | TourAPI 콘텐츠 ID             |
 | `contentTypeId`    | `contenttypeid`                       | 관광 타입 ID                  |
 | `title`            | `title`                               | 장소명/콘텐츠명               |
-| `regionId`         | `areaCode`, `sigunguCode`             | 내부 지역 참조                |
+| `regionId`         | `lDongRegnCd`, `lDongSignguCd`        | 내부 지역 참조                |
 | `category`         | `contentTypeId`, `lclsSystm*`         | PickTrip 내부 카테고리        |
 | `summary`          | `overview` (`/detailCommon2`)         | 한 줄 소개                    |
 | `address`          | `addr1`, `addr2`                      | 주소                          |
