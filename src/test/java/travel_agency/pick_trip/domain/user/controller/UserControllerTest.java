@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
@@ -65,6 +66,25 @@ class UserControllerTest {
             assertThat(result.getBody().email()).isEqualTo("test@test.com");
             assertThat(result.getBody().nickname()).isEqualTo("테스트유저");
             assertThat(result.getBody().provider()).isEqualTo("KAKAO");
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/v1/users/me")
+    class Withdraw {
+
+        @Test
+        @DisplayName("인증된 사용자가 탈퇴를 요청하면 204를 반환하고 서비스에 위임한다")
+        void authenticatedUser_returns204() {
+            // given
+            JwtUserPrincipal principal = principal();
+
+            // when: standaloneSetup에서 @AuthenticationPrincipal 주입이 불안정하므로 컨트롤러를 직접 호출한다
+            ResponseEntity<Void> result = userController.withdraw(principal);
+
+            // then
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+            then(userService).should().withdraw(USER_UID);
         }
     }
 }
