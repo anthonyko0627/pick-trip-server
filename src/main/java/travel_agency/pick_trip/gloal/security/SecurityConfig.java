@@ -76,6 +76,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/favorites/**").authenticated()
                         // Itinerary - 일정 생성·저장·조회·수정·공유 생성은 로그인 필요
                         .requestMatchers("/api/v1/itineraries/**").authenticated()
+                        // User - 내 정보 조회·회원 탈퇴는 로그인 필요
+                        .requestMatchers("/api/v1/users/**").authenticated()
                         // 그 외 /api/v1/** 는 아직 개발 중이라 잠시 허용한다.
                         // TODO: 개발 완료 후 authenticated() 로 좁힌다.
                         .anyRequest().permitAll())

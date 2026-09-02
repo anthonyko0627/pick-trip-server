@@ -32,6 +32,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // 탈퇴 30일 경과 계정 하드 삭제 배치. 실행 이력을 BATCH_* 메타 테이블에 남긴다 (DDL 은 Flyway V4).
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
     // TourAPI 상세 조회 캐시. 일일 요청 한도(개발계정 1,000건)를 넘기지 않도록 같은 콘텐츠 재조회를 막는다.
     // TTL 이 필요해 ConcurrentMapCacheManager 대신 Caffeine 을 쓴다.
     implementation 'org.springframework.boot:spring-boot-starter-cache'

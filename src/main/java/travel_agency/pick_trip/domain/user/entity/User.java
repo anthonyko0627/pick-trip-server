@@ -60,6 +60,10 @@ public class User {
     @Column(nullable = false)
     private boolean deleted;
 
+    // 탈퇴 시각. 30일 유예 기간 경과 판단 기준이며, 복구 시 null 로 돌아간다.
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -89,7 +93,18 @@ public class User {
         this.profileImageUrl = profileImageUrl;
     }
 
+    /** 소프트 삭제. 이미 탈퇴 상태면 deletedAt 을 유지해 유예 기간이 늘어나지 않게 한다. */
     public void withdraw() {
+        if (deleted) {
+            return;
+        }
         this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    /** 유예 기간 내 재로그인 시 탈퇴를 철회한다. */
+    public void restore() {
+        this.deleted = false;
+        this.deletedAt = null;
     }
 }

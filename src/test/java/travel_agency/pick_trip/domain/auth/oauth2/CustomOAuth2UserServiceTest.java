@@ -177,6 +177,32 @@ class CustomOAuth2UserServiceTest {
             // then
             assertThat(existingUser.getEmail()).isEqualTo(originalEmail);
         }
+
+        @Test
+        @DisplayName("탈퇴 유예 중인 사용자가 재로그인하면 탈퇴가 철회된다")
+        void reLogin_restoresWithdrawnUser() {
+            // given
+            Map<String, Object> attributes = Map.of(
+                    "sub", PROVIDER_ID, "email", EMAIL,
+                    "name", NICKNAME, "picture", PROFILE_IMG
+            );
+            User existingUser = userWithUid(UUID.randomUUID());
+            existingUser.withdraw();
+
+            OAuth2User oAuth2User = mockOAuth2User(attributes);
+            givenRegistrationId("google");
+            given(mockDelegate.loadUser(mockRequest)).willReturn(oAuth2User);
+            given(userRepository.findByProviderAndProviderUserId(OAuthProvider.GOOGLE, PROVIDER_ID))
+                    .willReturn(Optional.of(existingUser));
+
+            // when
+            customOAuth2UserService.loadUser(mockRequest);
+
+            // then
+            assertThat(existingUser.isDeleted()).isFalse();
+            assertThat(existingUser.getDeletedAt()).isNull();
+            then(userRepository).should(never()).save(any(User.class));
+        }
     }
 
     @Nested
