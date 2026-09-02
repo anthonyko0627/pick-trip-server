@@ -35,16 +35,35 @@
 
 ## 사용자
 
-| 메서드 | URL                | 인증 필요 | 설명                     |
-| ----- | ------------------ | :------: | ------------------------ |
-| GET   | `/api/v1/users/me` | O        | 현재 로그인 사용자 정보 조회 |
+| 메서드 | URL                | 인증 필요 | 설명                                                                  |
+| ----- | ------------------ | :------: | --------------------------------------------------------------------- |
+| GET   | `/api/v1/users/me` | O        | 현재 로그인 사용자 정보 조회                                            |
+| DELETE | `/api/v1/users/me` | O       | 회원 탈퇴 (소프트 삭제, 30일 후 일괄 하드 삭제. 유예 기간 내 재로그인 시 복구) |
 
 ## 콘텐츠
 
 | 메서드 | URL                      | 인증 필요 | 설명                                      |
 | ----- | ------------------------ | :------: | ----------------------------------------- |
-| GET   | `/api/v1/contents`       | X        | 콘텐츠 목록 조회 (지역, 카테고리, 필터 등) |
-| GET   | `/api/v1/contents/{id}`  | X        | 콘텐츠 상세 조회                           |
+| GET   | `/api/v1/contents`            | X        | 콘텐츠 목록 조회 (지역, 카테고리, 필터 등) |
+| GET   | `/api/v1/contents/{id}`       | X        | 콘텐츠 상세 조회                           |
+| GET   | `/api/v1/contents/{id}/nearby` | X       | 해당 콘텐츠 좌표 기준 반경 내 주변 콘텐츠 조회 (거리순) |
+
+`GET /api/v1/contents/{id}/nearby` 는 쿼리 파라미터 `radiusKm`(기본 5, 최대 20)과 `size`(기본 10, 최대 30)를 받는다.
+
+응답 각 항목의 거리·시간 필드:
+
+- `distanceKm` — 거리(km). `distanceBasis` 로 산출 기준을 구분한다.
+- `distanceBasis` — `ROAD`(Kakao Mobility 길찾기로 계산한 실제 자동차 도로 거리) 또는 `STRAIGHT`(직선 거리, 길찾기 실패 시 폴백).
+- `durationMinutes` — 자동차 소요 시간(분). `distanceBasis` 가 `STRAIGHT` 이면 `null`.
+
+정렬은 항상 `distanceKm` 오름차순이다. 직선 거리로 상위 `size` 개 후보를 추린 뒤 그 후보만 도로 거리를 조회한다(사용량 절약). 길찾기 API 장애 시 직선 거리 정렬로 폴백하며, 목적지별로 경로를 찾지 못한 항목만 `STRAIGHT` 로 표시된다(부분 폴백).
+
+조회 소스는 응답의 `source` 필드로 구분한다.
+
+- `LOCAL` — 로컬 적재분(`travel_contents`)에서 Haversine 근사로 조회. 기준 콘텐츠가 로컬에 있고 좌표가 유효하며 반경 내 로컬 행이 1건 이상일 때.
+- `TOURAPI` — 로컬로 답할 수 없어(기준 콘텐츠 미적재 · 좌표 없음/(0,0) · 반경 내 로컬 행 0건) TourAPI `locationBasedList2`로 조회. 좌표는 로컬 또는 TourAPI 상세에서 확보하며, 기준 콘텐츠 자신·MVP 외 콘텐츠 타입은 제외한다. 이 소스에서는 `summary`가 항상 `null`이고, 대상 지역(하동·영주·예천) 밖 항목은 `region`이 `null`이다.
+
+두 소스를 섞지 않는다. TourAPI가 기준 콘텐츠를 모르면 `CONTENT_NOT_FOUND`, 로컬·TourAPI 어디에서도 좌표를 얻지 못하면 `CONTENT_LOCATION_UNKNOWN`, TourAPI 호출이 실패하면 `CONTENT_PROVIDER_FAILED` 를 반환한다.
 
 ## 여행 바구니
 

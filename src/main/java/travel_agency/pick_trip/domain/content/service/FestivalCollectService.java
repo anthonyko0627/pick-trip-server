@@ -44,7 +44,7 @@ public class FestivalCollectService {
         TourApiFestivalResponse response;
         try {
             response = tourApiClient.searchFestival(
-                    eventStartDate, region.getAreaCode(), region.getSigunguCode(), 1, PAGE_SIZE);
+                    eventStartDate, region.getLDongRegnCd(), region.getLDongSignguCd(), 1, PAGE_SIZE);
         } catch (FeignException e) {
             log.warn("[수집] 축제 조회 실패 region={} from={} - 건너뜀: {}", region, eventStartDate, e.getMessage());
             return 0;

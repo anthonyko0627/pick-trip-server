@@ -39,7 +39,7 @@
 | `sourceContentId` (PK) | String | `contentid` |
 | `contentTypeId` | String | `contenttypeid` |
 | `title` | String | `title` |
-| `region` | `Region` (enum) | `areaCode`+`sigunguCode` 매핑 |
+| `region` | `Region` (enum) | `lDongRegnCd`+`lDongSignguCd` 매핑 |
 | `category` | String | `contentTypeId`+`lclsSystm*` 내부 매핑 |
 | `summary` | String(TEXT) | `overview` (`/detailCommon2`) |
 | `address` | String | `addr1`+`addr2` |

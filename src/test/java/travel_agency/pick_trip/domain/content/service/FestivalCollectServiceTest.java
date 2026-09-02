@@ -67,7 +67,7 @@ class FestivalCollectServiceTest {
     @Test
     @DisplayName("신규 축제를 행사 기간과 함께 저장한다")
     void collectFestivals_신규축제_저장() {
-        given(tourApiClient.searchFestival(EVENT_FROM, "36", "18", 1, 100))
+        given(tourApiClient.searchFestival(EVENT_FROM, "48", "850", 1, 100))
                 .willReturn(festivalResponse(festivalItem()));
         given(travelContentRepository.findById(FESTIVAL_ID)).willReturn(Optional.empty());
 
@@ -91,7 +91,7 @@ class FestivalCollectServiceTest {
     @Test
     @DisplayName("축제 조회가 실패하면 예외를 전파하지 않고 저장하지 않는다")
     void collectFestivals_호출실패_저장없음() {
-        given(tourApiClient.searchFestival(EVENT_FROM, "36", "18", 1, 100))
+        given(tourApiClient.searchFestival(EVENT_FROM, "48", "850", 1, 100))
                 .willThrow(feignError());
 
         int collected = festivalCollectService.collectFestivals(REGION, EVENT_FROM);
@@ -103,7 +103,7 @@ class FestivalCollectServiceTest {
     @Test
     @DisplayName("축제 응답이 오류 결과코드(HTTP 200)면 저장하지 않는다")
     void collectFestivals_오류코드_저장없음() {
-        given(tourApiClient.searchFestival(EVENT_FROM, "36", "18", 1, 100))
+        given(tourApiClient.searchFestival(EVENT_FROM, "48", "850", 1, 100))
                 .willReturn(errorResponse());
 
         int collected = festivalCollectService.collectFestivals(REGION, EVENT_FROM);

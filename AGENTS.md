@@ -192,6 +192,9 @@ src/main/java/travel_agency/pick_trip
 | MySQL 선택 | 팀 친숙도와 Docker Compose 로컬 환경 설정 단순화. 운영 이관 시 RDS MySQL 사용 예정. |
 | 소셜 로그인만 지원 | MVP 범위에서 자체 회원가입·비밀번호 관리 복잡도를 제거. Kakao·Google OAuth로 인증 위임. |
 | Spring MVC (동기) 유지 | 팀 학습 비용과 TourAPI 동기 호출 특성 고려. 리액티브 전환은 MVP 이후 검토. |
+| 근처 콘텐츠 도로 거리에 Kakao Mobility 여러 목적지 길찾기 | 기준점→주변 N점을 1콜로 조회. Tmap은 1:1·별도 가입. REST 키는 기존 Kakao 앱 재사용. |
+| 길찾기 실패 시 직선 거리 폴백(예외 아님) + 재시도 없음 | 근처 탐색은 보조 기능이라 완전 실패보다 근사 정렬이 낫고, 사용량을 아낀다. |
+| 회원 탈퇴는 소프트 삭제 + 30일 후 Spring Batch 하드 삭제 | 실수 탈퇴 복구 여지를 두고, 소유 데이터가 FK 없이 user_id 로만 연결돼 앱이 순서대로 지워야 한다. Batch 는 삭제 이력을 BATCH_* 테이블에 남긴다. |
 
 # AI Constraints
 

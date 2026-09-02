@@ -4,8 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.List;
 
+/**
+ * TourAPI {@code /locationBasedList2}(좌표·반경 기반 목록) 응답. 표준 목록 응답과 동일한 구조에
+ * 항목별 기준 좌표로부터의 거리 {@code dist}(m)가 추가된다.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record TourApiDetailCommonResponse(Response response) implements TourApiResponse {
+public record TourApiLocationListResponse(Response response) implements TourApiResponse {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Response(Header header, Body body) {
@@ -19,7 +23,7 @@ public record TourApiDetailCommonResponse(Response response) implements TourApiR
     public record Header(String resultCode, String resultMsg) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Body(Items items) {}
+    public record Body(Items items, int numOfRows, int pageNo, int totalCount) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Items(List<Item> item) {}
@@ -31,17 +35,15 @@ public record TourApiDetailCommonResponse(Response response) implements TourApiR
             String title,
             String addr1,
             String addr2,
-            String tel,
-            String homepage,
             String mapx,
             String mapy,
             String firstimage,
-            String overview,
-            String lclsSystm1,
-            String lclsSystm2,
-            String lclsSystm3,
+            /** 기준 좌표로부터의 거리(m). */
+            String dist,
             String lDongRegnCd,
-            String lDongSignguCd
+            String lDongSignguCd,
+            String lclsSystm1,
+            String lclsSystm2
     ) {}
 
     @Override

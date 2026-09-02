@@ -9,6 +9,7 @@ import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailImageRespo
 import travel_agency.pick_trip.domain.content.client.dto.TourApiDetailIntroResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiFestivalResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiListResponse;
+import travel_agency.pick_trip.domain.content.client.dto.TourApiLocationListResponse;
 import travel_agency.pick_trip.domain.content.client.dto.TourApiSyncResponse;
 
 @FeignClient(
@@ -20,8 +21,8 @@ public interface TourApiClient {
 
     @GetMapping("/areaBasedList2")
     TourApiListResponse getAreaBasedList(
-            @RequestParam String areaCode,
-            @RequestParam String sigunguCode,
+            @RequestParam String lDongRegnCd,
+            @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
@@ -30,9 +31,23 @@ public interface TourApiClient {
     @GetMapping("/searchKeyword2")
     TourApiListResponse searchByKeyword(
             @RequestParam String keyword,
-            @RequestParam String areaCode,
-            @RequestParam String sigunguCode,
+            @RequestParam String lDongRegnCd,
+            @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
+            @RequestParam int pageNo,
+            @RequestParam int numOfRows
+    );
+
+    /**
+     * 좌표·반경 기반 목록. {@code mapX}(경도)/{@code mapY}(위도) 중심 {@code radius}(m, 최대 20000) 안의
+     * 콘텐츠를 {@code arrange}(E=거리순) 순으로 반환한다.
+     */
+    @GetMapping("/locationBasedList2")
+    TourApiLocationListResponse getLocationBasedList(
+            @RequestParam String mapX,
+            @RequestParam String mapY,
+            @RequestParam int radius,
+            @RequestParam String arrange,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
     );
@@ -53,8 +68,8 @@ public interface TourApiClient {
     @GetMapping("/searchFestival2")
     TourApiFestivalResponse searchFestival(
             @RequestParam String eventStartDate,
-            @RequestParam(required = false) String areaCode,
-            @RequestParam(required = false) String sigunguCode,
+            @RequestParam(required = false) String lDongRegnCd,
+            @RequestParam(required = false) String lDongSignguCd,
             @RequestParam int pageNo,
             @RequestParam int numOfRows
     );
@@ -62,8 +77,8 @@ public interface TourApiClient {
     /** 콘텐츠 변경/삭제 동기화. {@code modifiedtime}(yyyyMMdd) 이후 변경분, {@code showflag}로 노출 여부. */
     @GetMapping("/areaBasedSyncList2")
     TourApiSyncResponse getAreaBasedSyncList(
-            @RequestParam String areaCode,
-            @RequestParam String sigunguCode,
+            @RequestParam String lDongRegnCd,
+            @RequestParam String lDongSignguCd,
             @RequestParam(required = false) String contentTypeId,
             @RequestParam(required = false) String modifiedtime,
             @RequestParam int pageNo,

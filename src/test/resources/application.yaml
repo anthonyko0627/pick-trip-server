@@ -10,6 +10,13 @@ spring:
   flyway:
     enabled: false
 
+  # Flyway 가 꺼져 있으므로 BATCH_* 메타 테이블은 Boot 가 자동 생성한다. Job 은 테스트가 직접 띄운다.
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
   jpa:
     hibernate:
       ddl-auto: create
@@ -57,3 +64,7 @@ tour-api:
   base-url: http://localhost
   photo-base-url: http://localhost
   service-key: ci-dummy-tour-api-key
+
+kakao-mobility:
+  base-url: http://localhost
+  rest-api-key: ci-dummy-kakao-rest-api-key
