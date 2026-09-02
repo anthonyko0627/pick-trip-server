@@ -45,6 +45,14 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
 
+  # 탈퇴 계정 하드 삭제 배치(userPurgeJob). 실행은 UserPurgeScheduler 가 맡으므로 부팅 시 자동 실행을 끈다.
+  # BATCH_* 메타 테이블 DDL 은 Flyway(V4) 로만 관리한다.
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
+
   jpa:
     hibernate:
       ddl-auto: validate # Flyway 가 스키마를 관리하므로 검증만 한다. update/create 로 바꾸지 않는다.
@@ -88,3 +96,10 @@ app:
 kakao-mobility:
   base-url: https://apis-navi.kakaomobility.com
   rest-api-key: ${KAKAO_CLIENT_ID}
+
+# 회원 탈퇴 유예·하드 삭제. 탈퇴 후 retention-days 가 지난 계정을 cron 시각에 userPurgeJob 이 일괄 삭제한다.
+# 스케줄은 SchedulingConfig 가 켜진 prod 프로파일에서만 동작한다.
+user:
+  purge:
+    retention-days: 30
+    cron: "0 0 4 * * *"
