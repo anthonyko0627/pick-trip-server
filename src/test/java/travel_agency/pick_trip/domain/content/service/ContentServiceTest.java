@@ -10,7 +10,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +27,7 @@ import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentSummaryResponse;
 import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse;
+import travel_agency.pick_trip.domain.content.dto.response.VisitorStatsResponse;
 import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.content.entity.DataStatus;
 import travel_agency.pick_trip.domain.content.entity.TravelContent;
@@ -41,6 +44,7 @@ class ContentServiceTest {
     @Mock private TourApiContentAdapter adapter;
     @Mock private TravelContentRepository travelContentRepository;
     @Mock private RoadDistanceResolver roadDistanceResolver;
+    @Mock private VisitorStatsService visitorStatsService;
     @InjectMocks private ContentService contentService;
 
     @Nested
@@ -54,7 +58,7 @@ class ContentServiceTest {
             ContentListRequest request = new ContentListRequest("HADONG", null, null, null, null, 0, 20);
             ContentListResponse expected = new ContentListResponse(1, 0, 20, List.of(
                     new ContentSummaryResponse("123", "쌍계사", 12, "경상남도 하동군", "https://img.jpg", 35.27, 127.58,
-                            ContentCategory.ATTRACTION, null, false, "HADONG")
+                            ContentCategory.ATTRACTION, null, false, "HADONG", null)
             ));
             given(adapter.fetchList(request, Region.HADONG)).willReturn(expected);
 
@@ -93,7 +97,7 @@ class ContentServiceTest {
                     35.27, 127.58, "한국의 4대 총림", "03:00~18:00", "연중무휴",
                     "가능", "성인 3,000원", "불가", "불가",
                     "약 2시간", null, "TourAPI", List.of(),
-                    ContentCategory.CULTURE, true, "HADONG"
+                    ContentCategory.CULTURE, true, "HADONG", null
             );
             given(adapter.fetchDetail("2741429")).willReturn(expected);
 
@@ -127,7 +131,7 @@ class ContentServiceTest {
             return new ContentDetailResponse(
                     ORIGIN_ID, "화개장터", 12, "경상남도 하동군", null, null,
                     latitude, longitude, null, null, null, null, null, null, null,
-                    null, null, "TourAPI", List.of(), ContentCategory.ATTRACTION, false, "HADONG");
+                    null, null, "TourAPI", List.of(), ContentCategory.ATTRACTION, false, "HADONG", null);
         }
 
         private NearbyContentResponse.NearbyContentItem remoteItem(String id, double distanceKm) {
@@ -366,6 +370,91 @@ class ContentServiceTest {
                 @Override public String getRegion() { return region; }
                 @Override public Double getDistanceKm() { return distanceKm; }
             };
+        }
+    }
+
+    @Nested
+    @DisplayName("visitorStats 붙이기")
+    class VisitorStats {
+
+        private static final VisitorStatsResponse STATS = new VisitorStatsResponse(
+                180_000L, 2_950L, "2026-05~2026-06", "한국관광공사 지역별 방문자수",
+                LocalDate.of(2026, 6, 30), true);
+
+        private ContentDetailResponse detail() {
+            return new ContentDetailResponse(
+                    "2741429", "쌍계사", 12, "경상남도 하동군", null, null, 35.27, 127.58, null,
+                    null, null, null, null, null, null, null, null, "TourAPI", List.of(),
+                    ContentCategory.CULTURE, true, "HADONG", null);
+        }
+
+        @Test
+        @DisplayName("상세 응답에 관광객수 지표를 붙인다")
+        void 상세_지표부착() {
+            // given
+            given(adapter.fetchDetail("2741429")).willReturn(detail());
+            given(visitorStatsService.findByContentIds(Region.HADONG, List.of("2741429")))
+                    .willReturn(Map.of("2741429", STATS));
+
+            // when
+            ContentDetailResponse result = contentService.getContentDetail("2741429");
+
+            // then
+            assertThat(result.visitorStats()).isEqualTo(STATS);
+            assertThat(result.visitorStats().approximate()).isTrue();
+        }
+
+        @Test
+        @DisplayName("지표가 없으면 visitorStats 를 null 로 둔다")
+        void 상세_지표없음_null() {
+            // given
+            given(adapter.fetchDetail("2741429")).willReturn(detail());
+            given(visitorStatsService.findByContentIds(Region.HADONG, List.of("2741429")))
+                    .willReturn(Map.of());
+
+            // when
+            ContentDetailResponse result = contentService.getContentDetail("2741429");
+
+            // then
+            assertThat(result.visitorStats()).isNull();
+        }
+
+        @Test
+        @DisplayName("지표 조회가 실패해도 콘텐츠 응답은 정상 반환한다")
+        void 상세_지표조회실패_응답유지() {
+            // given
+            given(adapter.fetchDetail("2741429")).willReturn(detail());
+            given(visitorStatsService.findByContentIds(any(), any()))
+                    .willThrow(new RuntimeException("visitor stats down"));
+
+            // when
+            ContentDetailResponse result = contentService.getContentDetail("2741429");
+
+            // then
+            assertThat(result.contentId()).isEqualTo("2741429");
+            assertThat(result.visitorStats()).isNull();
+        }
+
+        @Test
+        @DisplayName("목록은 지역 지표를 한 번만 조회해 모든 항목에 붙인다")
+        void 목록_지표부착() {
+            // given
+            ContentListRequest request = new ContentListRequest("HADONG", null, null, null, null, 0, 20);
+            ContentListResponse listResponse = new ContentListResponse(2, 0, 20, List.of(
+                    new ContentSummaryResponse("c1", "쌍계사", 12, "하동군", null, 35.2, 127.5,
+                            ContentCategory.CULTURE, null, true, "HADONG", null),
+                    new ContentSummaryResponse("c2", "화개장터", 12, "하동군", null, 35.3, 127.6,
+                            ContentCategory.ATTRACTION, null, false, "HADONG", null)));
+            given(adapter.fetchList(request, Region.HADONG)).willReturn(listResponse);
+            given(visitorStatsService.findByContentIds(Region.HADONG, List.of("c1", "c2")))
+                    .willReturn(Map.of("c1", STATS, "c2", STATS));
+
+            // when
+            ContentListResponse result = contentService.getContents(request);
+
+            // then
+            assertThat(result.items()).allSatisfy(item -> assertThat(item.visitorStats()).isEqualTo(STATS));
+            verify(visitorStatsService).findByContentIds(Region.HADONG, List.of("c1", "c2"));
         }
     }
 }

@@ -190,7 +190,7 @@ class ContentDetailCacheTest {
         return new ContentDetailResponse(
                 contentId, "쌍계사", 12, "경남 하동군", null, null, 35.0, 127.0, null,
                 null, null, null, null, null, null, null, null, null,
-                List.of(), null, false, "HADONG"
+                List.of(), null, false, "HADONG", null
         );
     }
 }

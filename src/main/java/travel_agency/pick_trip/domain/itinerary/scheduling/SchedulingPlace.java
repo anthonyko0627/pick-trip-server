@@ -11,7 +11,9 @@ public record SchedulingPlace(
         Double latitude,
         Double longitude,
         OperatingHours operatingHours,
-        int stayMinutes
+        int stayMinutes,
+        /** 바구니 우선순위가 "꼭 가기"인지 여부. 동선 탐색에서 동률일 때 먼저 잡는 기준으로만 쓴다. */
+        boolean mustVisit
 ) {
     public SchedulingPlace {
         // 호출부마다 null/0 방어를 반복하지 않도록 생성 시점에 한 번만 정규화한다.

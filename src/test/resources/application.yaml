@@ -65,6 +65,17 @@ tour-api:
   photo-base-url: http://localhost
   service-key: ci-dummy-tour-api-key
 
+visitor-stats:
+  base-url: http://localhost
+
 kakao-mobility:
   base-url: http://localhost
   rest-api-key: ci-dummy-kakao-rest-api-key
+
+itinerary:
+  cost:
+    car-cost-per-km-won: 142
+    transit-base-fare-won: 1500
+
+elevation:
+  base-url: http://localhost

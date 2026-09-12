@@ -48,3 +48,5 @@ src/main/resources/application-dev.yaml
 ### Claude ###
 .claude/settings.local.json
 .claude/worktrees/*
+
+graphify-out/*

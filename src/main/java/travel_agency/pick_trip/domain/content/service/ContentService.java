@@ -1,16 +1,20 @@
 package travel_agency.pick_trip.domain.content.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import travel_agency.pick_trip.domain.content.adapter.TourApiContentAdapter;
 import travel_agency.pick_trip.domain.content.dto.request.ContentListRequest;
 import travel_agency.pick_trip.domain.content.dto.response.ContentDetailResponse;
 import travel_agency.pick_trip.domain.content.dto.response.ContentListResponse;
+import travel_agency.pick_trip.domain.content.dto.response.ContentSummaryResponse;
 import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse;
 import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse.NearbyContentItem;
 import travel_agency.pick_trip.domain.content.dto.response.NearbyContentResponse.NearbySource;
+import travel_agency.pick_trip.domain.content.dto.response.VisitorStatsResponse;
 import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.content.entity.TravelContent;
 import travel_agency.pick_trip.domain.content.repository.TravelContentRepository;
@@ -19,6 +23,7 @@ import travel_agency.pick_trip.domain.region.Region;
 import travel_agency.pick_trip.gloal.error.ErrorCode;
 import travel_agency.pick_trip.gloal.error.exception.ContentException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ContentService {
@@ -31,14 +36,44 @@ public class ContentService {
     private final TourApiContentAdapter adapter;
     private final TravelContentRepository travelContentRepository;
     private final RoadDistanceResolver roadDistanceResolver;
+    private final VisitorStatsService visitorStatsService;
 
+    /** 목록의 모든 항목은 같은 지역이므로 관광객수 지표를 한 번만 조회해 붙인다. */
     public ContentListResponse getContents(ContentListRequest request) {
         Region region = Region.fromCode(request.region());
-        return adapter.fetchList(request, region);
+        ContentListResponse response = adapter.fetchList(request, region);
+
+        Map<String, VisitorStatsResponse> statsByContentId = findVisitorStats(
+                region, response.items().stream().map(ContentSummaryResponse::contentId).toList());
+        if (statsByContentId.isEmpty()) {
+            return response;
+        }
+        return new ContentListResponse(
+                response.totalCount(),
+                response.page(),
+                response.size(),
+                response.items().stream()
+                        .map(item -> item.withVisitorStats(statsByContentId.get(item.contentId())))
+                        .toList());
     }
 
     public ContentDetailResponse getContentDetail(String contentId) {
-        return adapter.fetchDetail(contentId);
+        ContentDetailResponse detail = adapter.fetchDetail(contentId);
+        Region region = detail.region() == null ? null : Region.fromCode(detail.region());
+        return detail.withVisitorStats(findVisitorStats(region, List.of(contentId)).get(contentId));
+    }
+
+    /**
+     * 관광객수 지표 조회. 지표는 보조 정보라 조회가 실패해도 콘텐츠 응답 자체를 막지 않고
+     * 빈 결과(필드 {@code null})로 내려보낸다.
+     */
+    private Map<String, VisitorStatsResponse> findVisitorStats(Region region, List<String> contentIds) {
+        try {
+            return visitorStatsService.findByContentIds(region, contentIds);
+        } catch (RuntimeException e) {
+            log.warn("[관광객수] 지표 조회 실패 - 필드를 비웁니다: {}", e.getMessage());
+            return Map.of();
+        }
     }
 
     /**

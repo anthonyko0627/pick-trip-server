@@ -1,5 +1,6 @@
 package travel_agency.pick_trip.infra.ai;
 
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -22,13 +23,14 @@ import travel_agency.pick_trip.infra.ai.dto.AiPlace;
 @Component
 public class OpenAiItineraryClient implements AiItineraryClient {
 
-    private static final String SYSTEM_PROMPT = """
+    /** 모드별 한 문단만 갈아끼운다. 나머지 제약은 두 모드가 동일해야 하므로 본문을 복제하지 않는다. */
+    private static final String SYSTEM_PROMPT_TEMPLATE = """
             당신은 경상도 소도시(하동, 영주, 예천) 여행 일정을 설계하는 전문 플래너입니다.
-            사용자가 선택한 장소만으로 현실적인 일정을 만드세요. 임의의 장소를 추가하지 마세요.
+            %s
 
             다음 제약을 반드시 지키세요.
             - 각 장소의 운영시간(useTime)과 휴무일(restDate)을 고려해 방문 시간대를 배치합니다.
-            - 좌표(latitude, longitude)를 활용해 하루 안의 이동 동선이 자연스럽도록 인접한 장소를 묶습니다.
+            - 지리적으로 가까운 장소끼리 같은 일차에 묶습니다. 세부 동선과 순서는 서버가 좌표로 다시 최적화합니다.
             - 우선순위가 "꼭 가기"인 장소는 반드시 포함하고 우선 배치합니다.
             - 동행·여행 스타일 조건을 고려해 걷기 부담·실내외 비율을 조정합니다.
             - 여행 기간(duration)에 맞춰 일차(dayIndex)를 1부터 나눕니다.
@@ -39,9 +41,18 @@ public class OpenAiItineraryClient implements AiItineraryClient {
             - contentId, 영문 코드, 괄호 안 숫자 ID를 절대 포함하지 마세요.
             - 다른 장소를 언급할 때는 장소 이름만 씁니다. 예: "슬로시티"(O), "슬로시티(773075)"(X).
             - 동행·스타일 조건은 입력에 제공된 한국어 표현만 씁니다. 예: "걷기 적게"(O), "LESS_WALKING"(X).
-
-            응답의 각 항목 contentId 에는 입력으로 받은 contentId 값만 사용하세요.
             """;
+
+    /** STRICT: 바구니 밖 장소를 아예 만들지 못하게 막는다. */
+    private static final String STRICT_RULE = """
+            사용자가 선택한 장소만으로 현실적인 일정을 만드세요. 임의의 장소를 추가하지 마세요.
+            응답의 각 항목 contentId 에는 입력으로 받은 contentId 값만 사용하세요.""";
+
+    /** AUGMENT: 추가 제안을 허용하되 후보 목록으로 한정한다. 실제 채택 여부는 서버 화이트리스트가 정한다. */
+    private static final String AUGMENT_RULE = """
+            사용자가 선택한 장소를 모두 포함하되, 빈 시간을 채우기 위해 같은 지역의 장소를 추가로 제안해도 됩니다.
+            추가하는 장소는 반드시 "[추가 제안 가능한 지역 장소]" 목록에서만 고르고, 그 장소의 contentId 를 목록에 적힌 값 그대로 씁니다.
+            목록에 없는 장소는 추가하지 마세요. 응답의 모든 contentId 는 입력으로 받은 값이어야 합니다.""";
 
     private final ChatClient chatClient;
 
@@ -53,7 +64,7 @@ public class OpenAiItineraryClient implements AiItineraryClient {
     public AiItineraryResult generate(AiItineraryRequest request) {
         try {
             AiItineraryResult result = chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
+                    .system(buildSystemPrompt(request))
                     .user(buildUserPrompt(request))
                     .call()
                     .entity(AiItineraryResult.class);
@@ -77,10 +88,20 @@ public class OpenAiItineraryClient implements AiItineraryClient {
     }
 
     /**
+     * "추가 제안 허용/금지" 문단만 바꿔 시스템 프롬프트를 만든다.
+     * 제시할 후보가 없으면 허용 문구가 가리킬 목록도 없으므로 STRICT 로 수렴시킨다.
+     */
+    String buildSystemPrompt(AiItineraryRequest request) {
+        return SYSTEM_PROMPT_TEMPLATE.formatted(
+                request.extraCandidates().isEmpty() ? STRICT_RULE : AUGMENT_RULE);
+    }
+
+    /**
      * 여행 조건과 장소 목록을 사용자 프롬프트 텍스트로 직렬화한다.
      * 운영시간·휴무일·좌표 등 상세가 없는 장소는 해당 항목을 생략한다.
      * 동행·우선순위는 한국어 라벨로 전달되며, 장소명과 contentId 는 별도 줄로 분리해
      * 모델이 "이름(contentId)" 형태로 인용하지 못하게 한다.
+     * 추가 후보 목록은 AUGMENT 모드에서만 채워지므로, STRICT 프롬프트는 종전과 동일하다.
      */
     String buildUserPrompt(AiItineraryRequest request) {
         StringBuilder sb = new StringBuilder();
@@ -94,8 +115,19 @@ public class OpenAiItineraryClient implements AiItineraryClient {
                 .append('\n');
 
         sb.append("\n[선택한 장소 목록]\n");
+        appendPlaces(sb, request.places());
+
+        if (!request.extraCandidates().isEmpty()) {
+            sb.append("\n[추가 제안 가능한 지역 장소]\n");
+            appendPlaces(sb, request.extraCandidates());
+        }
+        return sb.toString();
+    }
+
+    /** 후보 목록은 id·이름·분류만 채워져 있어, 없는 항목은 그대로 생략된다. */
+    private void appendPlaces(StringBuilder sb, List<AiPlace> places) {
         int index = 1;
-        for (AiPlace place : request.places()) {
+        for (AiPlace place : places) {
             sb.append(index++).append(". ").append(nullToDash(place.title())).append('\n');
             appendIfPresent(sb, "   - contentId", place.contentId());
             appendIfPresent(sb, "   - 분류", place.category());
@@ -105,7 +137,6 @@ public class OpenAiItineraryClient implements AiItineraryClient {
             appendIfPresent(sb, "   - 휴무일", place.restDate());
             appendIfPresent(sb, "   - 권장 체류시간", place.stayDuration());
         }
-        return sb.toString();
     }
 
     private void appendCoordinates(StringBuilder sb, AiPlace place) {

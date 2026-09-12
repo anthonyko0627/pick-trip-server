@@ -12,11 +12,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.assertj.core.api.ThrowableAssert;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import travel_agency.pick_trip.domain.itinerary.dto.request.GenerateItineraryRequest;
+import travel_agency.pick_trip.domain.itinerary.dto.request.GenerateMode;
 import travel_agency.pick_trip.domain.itinerary.dto.request.SaveItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryGenerateResponse;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryResponse;
@@ -29,6 +32,8 @@ import travel_agency.pick_trip.gloal.jwt.JwtUserPrincipal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
@@ -88,20 +93,43 @@ class ItineraryControllerTest {
                     List.of(new ItineraryGenerateResponse.Day(1, List.of(
                             new ItineraryGenerateResponse.Item(
                                     "c1", "쌍계사", 1, "오전 배치",
-                                    LocalTime.of(9, 0), LocalTime.of(10, 30), List.of())
+                                    LocalTime.of(9, 0), LocalTime.of(10, 30), List.of(), false, false)
                     ), LocalDate.of(2026, 7, 1), 0, 0.0, List.of())),
+                    List.of(),
+                    List.of(),
                     List.of()
             );
-            given(itineraryService.generate(USER_UID)).willReturn(expected);
+            given(itineraryService.generate(eq(USER_UID), any())).willReturn(expected);
 
             // when
-            ResponseEntity<ItineraryGenerateResponse> result = itineraryController.generate(principal());
+            ResponseEntity<ItineraryGenerateResponse> result =
+                    itineraryController.generate(principal(), new GenerateItineraryRequest(GenerateMode.AUGMENT));
 
             // then
             assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(result.getBody()).isNotNull();
             assertThat(result.getBody().title()).isEqualTo("하동 1박 2일 가족 여행");
             assertThat(result.getBody().days()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("요청 바디 없이 호출해도 200과 함께 기본 STRICT 모드로 서비스에 위임한다")
+        void generate_withoutBody_usesStrictMode() {
+            // given
+            ItineraryGenerateResponse expected = new ItineraryGenerateResponse(
+                    "하동 1박 2일 가족 여행", Region.HADONG, LocalDate.of(2026, 7, 1), 2,
+                    List.of(), List.of(), List.of(), List.of());
+            given(itineraryService.generate(eq(USER_UID), any())).willReturn(expected);
+
+            // when
+            ResponseEntity<ItineraryGenerateResponse> result = itineraryController.generate(principal(), null);
+
+            // then
+            assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+            ArgumentCaptor<GenerateItineraryRequest> captor =
+                    ArgumentCaptor.forClass(GenerateItineraryRequest.class);
+            then(itineraryService).should().generate(eq(USER_UID), captor.capture());
+            assertThat(captor.getValue().mode()).isEqualTo(GenerateMode.STRICT);
         }
     }
 

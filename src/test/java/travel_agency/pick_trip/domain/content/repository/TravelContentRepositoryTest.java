@@ -6,6 +6,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
@@ -17,6 +18,7 @@ import travel_agency.pick_trip.domain.content.entity.ContentCategory;
 import travel_agency.pick_trip.domain.content.entity.DataStatus;
 import travel_agency.pick_trip.domain.content.entity.TravelContent;
 import travel_agency.pick_trip.domain.content.repository.projection.NearbyContentProjection;
+import travel_agency.pick_trip.domain.content.repository.projection.RegionContentProjection;
 import travel_agency.pick_trip.domain.region.Region;
 
 /**
@@ -103,6 +105,44 @@ class TravelContentRepositoryTest {
         // then
         assertThat(result).extracting(NearbyContentProjection::getSourceContentId)
                 .containsExactly("d1", "d2");
+    }
+
+    @Test
+    @DisplayName("지역 후보 조회는 바구니에 담긴 콘텐츠와 비활성 콘텐츠를 제외한다")
+    void findRegionCandidates_excludesBasketAndInactive() {
+        // given
+        persist("a1", ORIGIN_LAT, ORIGIN_LNG, DataStatus.ACTIVE);
+        persist("a2", ORIGIN_LAT, ORIGIN_LNG, DataStatus.ACTIVE);
+        persist("a3", ORIGIN_LAT, ORIGIN_LNG, DataStatus.INACTIVE);
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        List<RegionContentProjection> result = travelContentRepository.findRegionCandidates(
+                Region.HADONG, DataStatus.ACTIVE, List.of("a1"), PageRequest.of(0, 10));
+
+        // then
+        assertThat(result).extracting(RegionContentProjection::contentId).containsExactly("a2");
+        assertThat(result.get(0).title()).isEqualTo("장소 a2");
+        assertThat(result.get(0).contentTypeId()).isEqualTo("12");
+    }
+
+    @Test
+    @DisplayName("지역 후보 조회는 Pageable 크기만큼만 잘라 반환한다")
+    void findRegionCandidates_limitsToPageSize() {
+        // given
+        persist("b1", ORIGIN_LAT, ORIGIN_LNG, DataStatus.ACTIVE);
+        persist("b2", ORIGIN_LAT, ORIGIN_LNG, DataStatus.ACTIVE);
+        persist("b3", ORIGIN_LAT, ORIGIN_LNG, DataStatus.ACTIVE);
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        List<RegionContentProjection> result = travelContentRepository.findRegionCandidates(
+                Region.HADONG, DataStatus.ACTIVE, List.of("없는-id"), PageRequest.of(0, 2));
+
+        // then
+        assertThat(result).extracting(RegionContentProjection::contentId).containsExactly("b1", "b2");
     }
 
     private void persist(String id, Double latitude, Double longitude, DataStatus dataStatus) {

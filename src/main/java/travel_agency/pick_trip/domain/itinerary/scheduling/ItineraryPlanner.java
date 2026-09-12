@@ -10,7 +10,9 @@ import java.util.Set;
 
 /**
  * AI 가 제안한 일차별 장소 배열을 실제 여행 가능한 일정으로 확정한다.
- * 바구니 화이트리스트 검증 → 휴무일 재배치 → 일차별 시각 배정 순으로 처리한다.
+ * 바구니 화이트리스트 검증 → 좌표 기반 일차 재배분 → 휴무일 재배치 → 일차별 시각 배정 순으로 처리한다.
+ * AI 가 나눈 일차 배분은 어느 경우에도 초기값일 뿐이며, 실제 배분·순서는 서버가 좌표로 다시 정한다.
+ * 휴무일 재배치를 재배분보다 뒤에 두는 이유는, 재배분이 휴무일을 모르는 채 장소를 옮기기 때문이다.
  */
 public final class ItineraryPlanner {
 
@@ -25,17 +27,27 @@ public final class ItineraryPlanner {
     private ItineraryPlanner() {
     }
 
+    /**
+     * @param context 이동수단·도로 행렬·시작 지점. 이동수단에 따라 구간 소요 시간 모델이 달라져
+     *                같은 장소 집합이라도 일차 배분·방문 순서가 달라진다.
+     *                시작 지점을 지정하면 그 장소에서 경로를 시작해 해당 일차의 첫 스톱으로 고정하고,
+     *                null 이면 좌표를 가진 첫 장소에서 시작하되 첫 자리도 재배치 대상이 된다.
+     */
     public static PlannedItinerary plan(String title,
                                         List<List<String>> dayContentIds,
                                         Map<String, SchedulingPlace> placesById,
                                         Map<String, String> reasonByContentId,
-                                        LocalDate travelDate) {
+                                        LocalDate travelDate,
+                                        SchedulingContext context) {
         List<List<String>> requested = (dayContentIds == null) ? List.of() : dayContentIds;
         Map<String, SchedulingPlace> places = (placesById == null) ? Map.of() : placesById;
         Map<String, String> reasons = (reasonByContentId == null) ? Map.of() : reasonByContentId;
 
         List<String> adjustments = new ArrayList<>();
         List<List<String>> daysPlan = filterToBasket(requested, places);
+        // 시작 지점 지정 여부와 무관하게 재배분한다. AI 배분은 초기값일 뿐이고,
+        // 미지정이면 RouteOptimizer 가 좌표를 가진 첫 장소를 출발점으로 삼는다.
+        daysPlan = RouteOptimizer.redistribute(daysPlan, places, context);
 
         // 휴무일이지만 옮길 일차가 없어 그대로 둔 장소. 스케줄링 후 안내를 덧붙이기 위해 모아둔다.
         Set<String> stillClosed = new HashSet<>();
@@ -52,7 +64,8 @@ public final class ItineraryPlanner {
                     i + 1,
                     travelDate == null ? null : travelDate.plusDays(i),
                     dayPlaces,
-                    reasons);
+                    reasons,
+                    context);
             days.add(stillClosed.isEmpty() ? day : withClosedNotes(day, stillClosed));
         }
 
@@ -139,7 +152,7 @@ public final class ItineraryPlanner {
                     List<String> notes = new ArrayList<>(stop.notes());
                     notes.add(CLOSED_STOP_NOTE);
                     return new ScheduledStop(stop.contentId(), stop.title(), stop.order(), stop.reason(),
-                            stop.startTime(), stop.endTime(), notes);
+                            stop.startTime(), stop.endTime(), notes, stop.autoRest());
                 })
                 .toList();
         return new ScheduledDay(day.dayIndex(), day.date(), stops,

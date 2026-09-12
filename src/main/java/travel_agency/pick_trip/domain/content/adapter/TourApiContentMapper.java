@@ -87,7 +87,9 @@ public class TourApiContentMapper {
                 images,
                 category,
                 category.isIndoor(),
-                region != null ? region.name() : null
+                region != null ? region.name() : null,
+                // 관광객수 지표는 ContentService 가 조회 시점에 덧붙인다(상세 응답은 캐시되므로 여기서 채우지 않는다).
+                null
         );
     }
 
@@ -161,7 +163,8 @@ public class TourApiContentMapper {
                 category,
                 null,
                 category.isIndoor(),
-                region.name()
+                region.name(),
+                null
         );
     }
 

@@ -59,7 +59,7 @@ class ContentControllerTest {
             // given
             ContentListResponse expected = new ContentListResponse(1, 0, 20, List.of(
                     new ContentSummaryResponse("123", "쌍계사", 12, "경상남도 하동군", "https://img.jpg", 35.27, 127.58,
-                            ContentCategory.ATTRACTION, null, false, "HADONG")
+                            ContentCategory.ATTRACTION, null, false, "HADONG", null)
             ));
             given(contentService.getContents(any(ContentListRequest.class))).willReturn(expected);
 
@@ -104,7 +104,7 @@ class ContentControllerTest {
                     35.27, 127.58, "한국의 4대 총림", "03:00~18:00", "연중무휴",
                     "가능", "성인 3,000원", "불가", "불가",
                     "약 2시간", null, "TourAPI", List.of(),
-                    ContentCategory.CULTURE, true, "HADONG"
+                    ContentCategory.CULTURE, true, "HADONG", null
             );
             given(contentService.getContentDetail("2741429")).willReturn(expected);
 

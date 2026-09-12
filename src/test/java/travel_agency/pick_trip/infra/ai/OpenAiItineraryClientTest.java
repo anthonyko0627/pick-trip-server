@@ -44,14 +44,26 @@ class OpenAiItineraryClientTest {
     }
 
     private AiItineraryRequest request() {
+        return request(List.of());
+    }
+
+    private AiItineraryRequest request(List<AiPlace> extraCandidates) {
         return new AiItineraryRequest(
                 "하동",
                 LocalDate.of(2026, 7, 1),
                 2,
                 List.of("아이와 함께", "걷기 적게"),
                 List.of(new AiPlace(
-                        "c1", "쌍계사", "12", 35.27, 127.58, "09:00~18:00", "연중무휴", "2시간", "꼭 가기"))
+                        "c1", "쌍계사", "12", 35.27, 127.58, "09:00~18:00", "연중무휴", "2시간", "꼭 가기")),
+                extraCandidates
         );
+    }
+
+    /** 후보는 id·이름·분류만 채워진다 (상세 조회를 하지 않기 때문). */
+    private List<AiPlace> candidates() {
+        return List.of(
+                new AiPlace("x9", "최참판댁", "12", null, null, null, null, null, null),
+                new AiPlace("x10", "화개장터", "14", null, null, null, null, null, null));
     }
 
     private AiItineraryResult validResult() {
@@ -102,6 +114,33 @@ class OpenAiItineraryClientTest {
         }
 
         @Test
+        @DisplayName("추가 후보가 있으면 후보 섹션에 장소명과 contentId를 함께 싣는다")
+        void withCandidates_appendsCandidateSection() {
+            // when
+            String prompt = client.buildUserPrompt(request(candidates()));
+
+            // then
+            assertThat(prompt)
+                    .contains("[추가 제안 가능한 지역 장소]")
+                    .contains("최참판댁")
+                    .contains("- contentId: x9")
+                    .contains("화개장터")
+                    .contains("- contentId: x10");
+        }
+
+        @Test
+        @DisplayName("추가 후보가 없으면 후보 섹션을 아예 붙이지 않는다 (STRICT 프롬프트 유지)")
+        void withoutCandidates_omitsCandidateSection() {
+            // when
+            String prompt = client.buildUserPrompt(request());
+
+            // then
+            assertThat(prompt)
+                    .doesNotContain("[추가 제안 가능한 지역 장소]")
+                    .contains("[선택한 장소 목록]");
+        }
+
+        @Test
         @DisplayName("장소명과 contentId를 별도 줄로 분리해 이름 옆에 ID가 붙지 않는다")
         void separatesContentIdFromTitle() {
             // when
@@ -112,6 +151,48 @@ class OpenAiItineraryClientTest {
                     .doesNotContain("(contentId=")
                     .contains("쌍계사")
                     .contains("- contentId: c1");
+        }
+    }
+
+    @Nested
+    @DisplayName("buildSystemPrompt")
+    class BuildSystemPrompt {
+
+        @Test
+        @DisplayName("후보가 없으면 임의 장소 추가를 금지하는 문단을 넣는다")
+        void noCandidates_forbidsExtraPlaces() {
+            // when
+            String prompt = client.buildSystemPrompt(request());
+
+            // then
+            assertThat(prompt)
+                    .contains("임의의 장소를 추가하지 마세요.")
+                    .doesNotContain("추가로 제안해도 됩니다");
+        }
+
+        @Test
+        @DisplayName("후보가 있으면 후보 목록에서만 고르라는 문단으로 바꾼다")
+        void withCandidates_allowsExtraPlacesFromList() {
+            // when
+            String prompt = client.buildSystemPrompt(request(candidates()));
+
+            // then
+            assertThat(prompt)
+                    .contains("같은 지역의 장소를 추가로 제안해도 됩니다.")
+                    .contains("[추가 제안 가능한 지역 장소]")
+                    .doesNotContain("임의의 장소를 추가하지 마세요.");
+        }
+
+        @Test
+        @DisplayName("모드와 무관하게 reason 작성 규칙 등 공통 제약은 동일하게 유지한다")
+        void bothModes_shareCommonConstraints() {
+            // when
+            String strict = client.buildSystemPrompt(request());
+            String augment = client.buildSystemPrompt(request(candidates()));
+
+            // then
+            assertThat(strict).contains("contentId, 영문 코드, 괄호 안 숫자 ID를 절대 포함하지 마세요.");
+            assertThat(augment).contains("contentId, 영문 코드, 괄호 안 숫자 ID를 절대 포함하지 마세요.");
         }
     }
 

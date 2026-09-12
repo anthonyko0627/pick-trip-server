@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import travel_agency.pick_trip.domain.itinerary.dto.request.GenerateItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.request.SaveItineraryRequest;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryGenerateResponse;
 import travel_agency.pick_trip.domain.itinerary.dto.response.ItineraryResponse;
@@ -31,12 +32,15 @@ public class ItineraryController {
 
     /**
      * 바구니의 선택 콘텐츠·여행 조건으로 AI 일정을 생성한다 (저장 전 미리보기).
+     * 요청 바디는 선택이며, 없으면 기존과 동일하게 {@code STRICT} 모드로 동작한다.
      */
     @PostMapping("/generate")
     public ResponseEntity<ItineraryGenerateResponse> generate(
-            @AuthenticationPrincipal JwtUserPrincipal principal
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            @RequestBody(required = false) GenerateItineraryRequest request
     ) {
-        return ResponseEntity.ok(itineraryService.generate(principal.getUid()));
+        GenerateItineraryRequest effective = request == null ? GenerateItineraryRequest.defaults() : request;
+        return ResponseEntity.ok(itineraryService.generate(principal.getUid(), effective));
     }
 
     /**
