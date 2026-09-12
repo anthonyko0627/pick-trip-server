@@ -15,6 +15,10 @@ User 1──< Basket ──< BasketItem >── TravelContent
 User 1──< Itinerary 1──< ItineraryDay 1──< ItineraryItem >── TravelContent
               │
               └──1 ShareToken
+
+Region 1──< RegionVisitorStats
+
+TravelContent (source_content_id 값 참조, FK 없음) ──< ContentCongestion
 ```
 
 ## 테이블 정의
@@ -151,3 +155,38 @@ TourAPI 기반 콘텐츠 원천 데이터. `content_details`와 1:1 관계.
 | `token`        | 예측 불가능한 공유 토큰 (UUID 또는 동등 수준) |
 | `isActive`     | 링크 활성 여부                                |
 | `createdAt`    | 생성 시각                                     |
+
+---
+
+### `region_visitor_stats`
+
+지역(시군구)·기준 연월 단위 방문자수 스냅샷. 공공데이터포털 "한국관광공사 빅데이터 지역별 방문자수"(15101972)를
+`VisitorStatsScheduler`가 월 단위로 수집해 저장한다. 개별 장소 단위 통계가 아니므로 콘텐츠 응답에는 항상
+근사값(`approximate=true`)으로 내려준다.
+
+| 필드            | 설명                                                      |
+| -------------- | --------------------------------------------------------- |
+| `region`       | 지역 (`HADONG`, `YEONGJU`, `YECHEON`)                      |
+| `statMonth`    | 기준 연월 (`yyyy-MM`). 원천이 일 단위라 월 단위로 합산 보관 |
+| `visitorCount` | 해당 지역·연월의 누적 방문자수                            |
+| `source`       | 데이터 출처 문자열                                        |
+| `collectedAt`  | 수집 시각. 같은 (지역, 연월) 재수집 시 값과 함께 갱신됨    |
+
+`(region, statMonth)` 유니크 제약.
+
+---
+
+### `content_congestion`
+
+콘텐츠별 시간대(0~23시 중 방문 가능 시간대) 혼잡 스냅샷. 지역 방문자수와 바구니에 담긴 횟수를 조합해
+`CongestionCalculator`가 산출하며, 지역 단위 배치가 통째로 재계산·교체한다.
+
+| 필드               | 설명                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| `sourceContentId`  | TourAPI `contentid`. `travel_contents`와 FK 없이 값으로만 연결 (콘텐츠는 보조 캐시라 사라질 수 있음) |
+| `hourSlot`         | 0~23 시간대                                                          |
+| `congestionLevel`  | `LOW` / `MEDIUM` / `HIGH`                                            |
+| `score`            | 혼잡 산출 점수                                                        |
+| `computedAt`       | 산출 시각                                                             |
+
+`(sourceContentId, hourSlot)` 유니크 제약.
